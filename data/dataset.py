@@ -19,7 +19,8 @@ class DemonstrationDataset(Dataset):
         with open(path, "rb") as fp:
             trajectories = pickle.load(fp)
         obs, actions = zip(*trajectories)
-        obs = [o["observation"] for o in obs]
+        obs = [torch.from_numpy(o["observation"]) for o in obs]
+        actions = [torch.from_numpy(a) for a in actions]
         return DemonstrationDataset(obs, actions)
         
     def __len__(self):
