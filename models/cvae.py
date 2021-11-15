@@ -32,7 +32,7 @@ class Encoder(nn.Module):
     
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(24, 12)
+        self.fc1 = nn.Linear(23, 12)
         self.fc2 = nn.Linear(12, 4)
 
     def forward(self, action: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
@@ -46,7 +46,7 @@ class Decoder(nn.Module):
     
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(22, 12)
+        self.fc1 = nn.Linear(21, 12)
         self.fc2 = nn.Linear(12, 4)
 
     def forward(self, latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
