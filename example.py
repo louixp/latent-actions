@@ -1,4 +1,3 @@
-import pdb
 from time import sleep
 
 import numpy as np
@@ -7,16 +6,18 @@ import gym
 import panda_gym
 
 from cvae.cvae import ConditionalVAE
+from controller import Controller
 
 env = gym.make('PandaPickAndPlace-v1', render=True)
 cvae = ConditionalVAE()
 latent_action_decoder = cvae.decoder
+controller = Controller(scale=10)
 
 obs = env.reset()
-pdb.set_trace()
 done = False
 while not done:
-    latent_action = torch.rand((1, 2))
+    latent_action = controller.get_action()
+    print(latent_action)
     context = torch.from_numpy(obs['observation'])
     context = torch.unsqueeze(context, 0).float()
     
@@ -25,6 +26,6 @@ while not done:
     action = np.squeeze(action)
 
     obs, reward, done, info = env.step(action)
-    sleep(0.01)
+    sleep(1)
 
 env.close()
