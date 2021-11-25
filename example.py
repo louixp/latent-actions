@@ -8,11 +8,12 @@ import panda_gym
 from cvae.cvae import ConditionalVAE
 from controller import Controller
 
-env = gym.make('PandaPickAndPlace-v1', render=True)
-cvae = ConditionalVAE()
-latent_action_decoder = cvae.decoder
 controller = Controller(scale=10)
 
+cvae = ConditionalVAE()
+latent_action_decoder = cvae.decoder
+
+env = gym.make('PandaPickAndPlace-v1', render=True).env
 obs = env.reset()
 done = False
 while not done:
@@ -25,6 +26,6 @@ while not done:
     action = np.squeeze(action)
 
     obs, reward, done, info = env.step(action)
-    sleep(1)
+    sleep(0.1)
 
 env.close()
