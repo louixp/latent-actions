@@ -11,40 +11,46 @@ from pytorch_lightning import LightningModule, Trainer, seed_everything
 
 class ConditionalVAE(LightningModule):
 
-    def __init__(self, lr: float = 1e-2, kl_coeff: float =0.1):
+    def __init__(self, 
+            lr: float = 1e-2, 
+            kl_coeff: float = 0.1, 
+            p_dropout: float = 0.5):
         super().__init__()
         self.lr = lr
         self.kl_coeff = kl_coeff
+        self.p_dropout = p_dropout
 
         self.encoder = Encoder()
         self.decoder = Decoder()
         self.fc_mu = nn.Linear(4, 2)
         self.fc_var = nn.Linear(4, 2)
 
-    def forward(self, action: torch.Tensor, context: torch.Tensor) -> List[torch.Tensor]:
-        x = self.encoder(action, context)
+    def forward(self, 
+            action: torch.Tensor, 
+            context: torch.Tensor, 
+            return_dist: bool = False) -> List[torch.Tensor]:
+        masked_context = F.dropout(
+                context, p=self.p_dropout, training=self.training) 
+        x = self.encoder(action, masked_context)
         mu = self.fc_mu(x)
         log_var = self.fc_var(x)
         p, q, z = self.sample(mu, log_var)
-        return self.decoder(z, context)
+        if return_dist:
+            return self.decoder(z, masked_context), p, q
+        else:
+            return self.decoder(z, masked_context)
     
-    def _run_step(self, action: torch.Tensor, context: torch.Tensor) -> List[torch.Tensor]:
-        x = self.encoder(action, context)
-        mu = self.fc_mu(x)
-        log_var = self.fc_var(x)
-        p, q, z = self.sample(mu, log_var)
-        return self.decoder(z, context), p, q
-
     def sample(self, mu, log_var):
         std = torch.exp(log_var / 2)
-        p = torch.distributions.Normal(torch.zeros_like(mu), torch.ones_like(std))
+        p = torch.distributions.Normal(
+                torch.zeros_like(mu), torch.ones_like(std))
         q = torch.distributions.Normal(mu, std)
         z = q.rsample()
         return p, q, z
 
     def step(self, batch, batch_idx):
         context, action = batch
-        action_hat, p, q = self._run_step(action, context)
+        action_hat, p, q = self.forward(action, context, return_dist=True)
 
         recon_loss = F.mse_loss(action_hat, action, reduction="mean")
 
@@ -84,7 +90,8 @@ class Encoder(nn.Module):
         self.fc1 = nn.Linear(23, 12)
         self.fc2 = nn.Linear(12, 4)
 
-    def forward(self, action: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+    def forward(self, 
+            action: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         x = torch.cat([action, context], dim = 1)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
@@ -98,7 +105,8 @@ class Decoder(nn.Module):
         self.fc1 = nn.Linear(21, 12)
         self.fc2 = nn.Linear(12, 4)
 
-    def forward(self, latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+    def forward(self, 
+            latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         x = torch.cat([latent, context], dim = 1)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)

@@ -17,7 +17,6 @@ obs = env.reset()
 done = False
 while not done:
     latent_action = controller.get_action()
-    print(latent_action)
     context = torch.from_numpy(obs['observation'])
     context = torch.unsqueeze(context, 0).float()
     
