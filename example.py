@@ -1,6 +1,6 @@
 import multiprocessing as mp
 import platform
-from time import sleep
+from time import sleep 
 
 from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
@@ -17,14 +17,15 @@ ACTION_SCALE = 10
 
 def visualize(decoder, conn: mp.connection.Connection):
     def plot_function(i):
-        x, y, z = np.meshgrid(np.arange(-10, 10, 1),
-                              np.arange(-10, 10, 1),
+        x, y, z = np.meshgrid(np.arange(-ACTION_SCALE, ACTION_SCALE, 2),
+                              np.arange(-ACTION_SCALE, ACTION_SCALE, 2),
                               0)
         
         latent_actions = np.concatenate((x, y), axis=-1)
         latent_actions = torch.from_numpy(latent_actions.reshape((-1, 2))).float() 
         latent_actions *= ACTION_SCALE
-        context = conn.recv()        
+        prev_action, context = conn.recv()        
+        prev_action = prev_action.numpy()[0]
         contexts = context.expand(latent_actions.shape[0], context.shape[1])
 
         decoded_actions = decoder(latent_actions, contexts)
@@ -34,11 +35,16 @@ def visualize(decoder, conn: mp.connection.Connection):
         u, v, w = np.split(decoded_actions, 3, axis=-1) 
 
         ax.cla() 
-        ax.quiver(x, y, z, u, v, w, length=0.01)
+        # FIXME: Plotted actions don't have x, y directions.
+        ax.quiver(x, y, z, u, v, w, length=0.1, normalize=True)
+        ax.plot(*prev_action, 'ro')
+        ax.set_xlabel('Latent x')
+        ax.set_ylabel('Latent y')
+        ax.set_title('Latent Action Decoder Vector Field')
 
     fig = plt.figure()
     ax = fig.gca(projection='3d')
-    ani = FuncAnimation(fig, plot_function, interval=1000)
+    ani = FuncAnimation(fig, plot_function, interval=1)
     plt.show()
 
 def simulate(decoder, conn: mp.connection.Connection):
@@ -52,7 +58,7 @@ def simulate(decoder, conn: mp.connection.Connection):
         latent_action = controller.get_action()
         context = torch.from_numpy(obs['observation'])
         context = torch.unsqueeze(context, 0).float()
-        conn.send(context)
+        conn.send((latent_action, context))
         
         action = decoder(latent_action, context)
         action = action.detach().numpy()
