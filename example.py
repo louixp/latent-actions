@@ -13,17 +13,20 @@ import panda_gym
 from cvae.cvae import ConditionalVAE
 from controller import Controller
 
+DEBUG = False 
 ACTION_SCALE = 10
 
 def visualize(decoder, conn: mp.connection.Connection):
+    x, y, z = np.meshgrid(np.arange(-ACTION_SCALE, ACTION_SCALE, 2),
+                          np.arange(-ACTION_SCALE, ACTION_SCALE, 2),
+                          0)
+    latent_actions = np.concatenate((x, y), axis=-1)
+    latent_actions = torch.from_numpy(latent_actions.reshape((-1, 2))).float() 
+    latent_actions *= ACTION_SCALE
+
     def plot_function(i):
-        x, y, z = np.meshgrid(np.arange(-ACTION_SCALE, ACTION_SCALE, 2),
-                              np.arange(-ACTION_SCALE, ACTION_SCALE, 2),
-                              0)
-        
-        latent_actions = np.concatenate((x, y), axis=-1)
-        latent_actions = torch.from_numpy(latent_actions.reshape((-1, 2))).float() 
-        latent_actions *= ACTION_SCALE
+        ax.cla() 
+
         prev_action, context = conn.recv()        
         prev_action = prev_action.numpy()[0]
         contexts = context.expand(latent_actions.shape[0], context.shape[1])
@@ -33,19 +36,29 @@ def visualize(decoder, conn: mp.connection.Connection):
         decoded_actions = decoded_actions.reshape((x.shape[0], x.shape[1], 3))
 
         u, v, w = np.split(decoded_actions, 3, axis=-1) 
-
-        ax.cla() 
         ax.quiver(x, y, z, u, v, w, normalize=True)
+
+        if DEBUG:
+            decoded_actions_ref = decoder(
+                    torch.zeros_like(latent_actions), 
+                    torch.zeros_like(contexts))
+            decoded_actions_ref = decoded_actions_ref.detach().numpy()[:, :3]
+            decoded_actions_ref = decoded_actions_ref.reshape(
+                    (x.shape[0], x.shape[1], 3))
+            u_ref, v_ref, w_ref = np.split(decoded_actions_ref, 3, axis=-1) 
+            ax.quiver(x, y, z, u_ref, v_ref, w_ref, color='lime', normalize=True)
+
+        # Controller/latent current posistion.
         ax.plot(*prev_action, 'ro')
         # Small hacks to 'equalize' axes since matplotlib doesn't support it.
         ax.plot(0, 0, 2.5, alpha=0)
         ax.plot(0, 0, -2.5, alpha=0)
-        ax.set_xlabel('Latent x')
-        ax.set_ylabel('Latent y')
-        ax.set_title('Latent Action Decoder Vector Field')
 
     fig = plt.figure()
     ax = fig.gca(projection='3d')
+    ax.set_xlabel('Latent x')
+    ax.set_ylabel('Latent y')
+    ax.set_title('Latent Action Decoder Vector Field')
     ani = FuncAnimation(fig, plot_function, interval=1)
     plt.show()
 
