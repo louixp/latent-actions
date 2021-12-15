@@ -167,7 +167,7 @@ if __name__ == "__main__":
         ModelClass = ConditionalVAE
 
     parser.add_argument("--batch_size", type=int, default=32)
-    parser = VAE.add_model_specific_args(parser)
+    parser = ModelClass.add_model_specific_args(parser)
     args = parser.parse_args()
 
     from dataset import DemonstrationDataset
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
     
-    model = VAE(**vars(args))
+    model = ModelClass(**vars(args))
     wandb_logger = WandbLogger(project="latent-action")
     trainer = Trainer(logger=wandb_logger)
     trainer.fit(model, train_loader, test_loader)
