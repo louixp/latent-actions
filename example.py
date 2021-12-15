@@ -35,9 +35,11 @@ def visualize(decoder, conn: mp.connection.Connection):
         u, v, w = np.split(decoded_actions, 3, axis=-1) 
 
         ax.cla() 
-        # FIXME: Plotted actions don't have x, y directions.
-        ax.quiver(x, y, z, u, v, w, length=0.1, normalize=True)
+        ax.quiver(x, y, z, u, v, w, normalize=True)
         ax.plot(*prev_action, 'ro')
+        # Small hacks to 'equalize' axes since matplotlib doesn't support it.
+        ax.plot(0, 0, 2.5, alpha=0)
+        ax.plot(0, 0, -2.5, alpha=0)
         ax.set_xlabel('Latent x')
         ax.set_ylabel('Latent y')
         ax.set_title('Latent Action Decoder Vector Field')
