@@ -5,10 +5,11 @@ from torch.utils.data import Dataset
 
 class DemonstrationDataset(Dataset):
 
-    def __init__(self, observations, actions):
-        assert len(observations) == len(actions), \
-            "Different amount of observations and actions"
+    def __init__(self, observations, goals, actions):
+        assert len(observations) == len(goals) == len(actions), \
+            "Different amount of observations, goals, or actions."
         self.observations = observations
+        self.goals = goals
         self.actions = actions
 
     @classmethod
@@ -19,14 +20,24 @@ class DemonstrationDataset(Dataset):
         with open(path, "rb") as fp:
             trajectories = pickle.load(fp)
         obs, actions = zip(*trajectories)
-        obs = [torch.squeeze(torch.from_numpy(o["observation"])) for o in obs]
+        observations = [
+                torch.squeeze(torch.from_numpy(o["observation"])) for o in obs]
         # Remove time wrapper feature.
-        obs = [o[:-1] for o in obs]
+        observations = [o[:-1] for o in observations]
+        goals = [torch.squeeze(torch.from_numpy(o["desired_goal"])) for o in obs]
         actions = [torch.squeeze(torch.from_numpy(a)) for a in actions]
-        return DemonstrationDataset(obs, actions)
+        return DemonstrationDataset(observations, goals, actions)
         
     def __len__(self):
         return len(self.observations)
 
     def __getitem__(self, idx):
         return self.observations[idx], self.actions[idx] 
+
+    def get_context_dim(self):
+        # TODO: Add goal to context.
+        return self.observations.shape[0]
+
+    def get_action_dim(self):
+        return self.actions.shape[0]
+

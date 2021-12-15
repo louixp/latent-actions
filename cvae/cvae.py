@@ -1,5 +1,6 @@
 """Latent Action Conditional AutoEncoder."""
 
+from argparse import ArgumentParser
 from typing import List, Tuple
 
 import torch
@@ -7,6 +8,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from pytorch_lightning import LightningModule, Trainer, seed_everything
+from pytorch_lightning.loggers import WandbLogger
 
 
 class VAE(LightningModule):
@@ -17,14 +19,15 @@ class VAE(LightningModule):
             latent_dim: int = 2,
             enc_dims: Tuple[int] = (3, 2),
             dec_dims: Tuple[int] = (3, ),
-            lr: float = 1e-2, 
-            p_dropout: float = 0.5):
+            lr: float = 1e-4,
+            kl_coeff: float = 0.1,
+            **kwargs):
         super().__init__()
 
         self.save_hyperparameters()
         
         self.lr = lr
-        self.p_dropout = p_dropout
+        self.kl_coeff = kl_coeff
 
         self.encoder = nn.Sequential(
                 nn.Linear(action_dim, enc_dims[0]),
@@ -91,6 +94,16 @@ class VAE(LightningModule):
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
 
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("--lr", type=float, default=1e-4)
+        parser.add_argument("--kl_coeff", type=float, default=0.1)
+        parser.add_argument("--latent_dim", type=int, default=2)
+        parser.add_argument("--enc_dims", nargs='+', type=int, default=(3, 2))
+        parser.add_argument("--dec_dims", nargs='+', type=int, default=(3, ))
+        return parser
+
 
 class ConditionalVAE(VAE):
 
@@ -100,16 +113,15 @@ class ConditionalVAE(VAE):
             latent_dim: int = 2,
             enc_dims: Tuple[int] = (12, 4),
             dec_dims: Tuple[int] = (12, ),
-            lr: float = 1e-2, 
-            kl_coeff: float = 0.1, 
-            p_dropout: float = 0.5):
+            lr: float = 1e-4, 
+            kl_coeff: float = 0.1,
+            **kwargs): 
         super().__init__()
 
         self.save_hyperparameters()
         
         self.lr = lr
         self.kl_coeff = kl_coeff
-        self.p_dropout = p_dropout
 
         self.encoder = nn.Sequential(
                 nn.Linear(action_dim + context_dim, enc_dims[0]),
@@ -145,10 +157,28 @@ class ConditionalVAE(VAE):
 
 
 if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument(
+            "--model_class", default="VAE", type=str, choices=["VAE", "cVAE"])
+    script_args, _ = parser.parse_known_args()
+    if script_args.model_class == "VAE":
+        ModelClass = VAE 
+    else:
+        ModelClass = ConditionalVAE
+
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser = VAE.add_model_specific_args(parser)
+    args = parser.parse_args()
+
     from dataset import DemonstrationDataset
     dataset = DemonstrationDataset.from_baselines_rl_zoo(
             "../../rl-baselines3-zoo/demonstration.pkl")
-    dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
-    model = ConditionalVAE()
-    trainer = Trainer()
-    trainer.fit(model, dataloader)
+    train_set, test_set = torch.utils.data.random_split(
+            dataset, [int(len(dataset) * .8), int(len(dataset) * .2)])
+    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
+    test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
+    
+    model = VAE(**vars(args))
+    wandb_logger = WandbLogger(project="latent-action")
+    trainer = Trainer(logger=wandb_logger)
+    trainer.fit(model, train_loader, test_loader)
