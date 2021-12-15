@@ -18,14 +18,12 @@ class VAE(LightningModule):
             enc_dims: Tuple[int] = (3, 2),
             dec_dims: Tuple[int] = (3, ),
             lr: float = 1e-2, 
-            kl_coeff: float = 0.1, 
             p_dropout: float = 0.5):
         super().__init__()
 
         self.save_hyperparameters()
         
         self.lr = lr
-        self.kl_coeff = kl_coeff
         self.p_dropout = p_dropout
 
         self.encoder = nn.Sequential(
@@ -128,7 +126,8 @@ class ConditionalVAE(VAE):
     def forward(self, *, 
             latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         """Inference only. See step() for training."""
-        return self.decoder(latent)
+        z = torch.cat([latent, context], dim = 1)
+        return self.decoder(z)
     
     def step(self, batch, batch_idx):
         context, action = batch

@@ -10,7 +10,7 @@ import torch
 import gym
 import panda_gym
 
-from cvae.cvae import ConditionalVAE
+from cvae import cvae 
 from controller import Controller
 
 DEBUG = False 
@@ -31,7 +31,7 @@ def visualize(decoder, conn: mp.connection.Connection):
         prev_action = prev_action.numpy()[0]
         contexts = context.expand(latent_actions.shape[0], context.shape[1])
 
-        decoded_actions = decoder(latent_actions, contexts)
+        decoded_actions = decoder(latent=latent_actions, context=contexts)
         decoded_actions = decoded_actions.detach().numpy()[:, :3]
         decoded_actions = decoded_actions.reshape((x.shape[0], x.shape[1], 3))
 
@@ -40,8 +40,8 @@ def visualize(decoder, conn: mp.connection.Connection):
 
         if DEBUG:
             decoded_actions_ref = decoder(
-                    torch.zeros_like(latent_actions), 
-                    torch.zeros_like(contexts))
+                    latent=torch.zeros_like(latent_actions), 
+                    context=torch.zeros_like(contexts))
             decoded_actions_ref = decoded_actions_ref.detach().numpy()[:, :3]
             decoded_actions_ref = decoded_actions_ref.reshape(
                     (x.shape[0], x.shape[1], 3))
@@ -75,7 +75,7 @@ def simulate(decoder, conn: mp.connection.Connection):
         context = torch.unsqueeze(context, 0).float()
         conn.send((latent_action, context))
         
-        action = decoder(latent_action, context)
+        action = decoder(latent=latent_action, context=context)
         action = action.detach().numpy()
         action = np.squeeze(action)
 
@@ -87,10 +87,10 @@ def simulate(decoder, conn: mp.connection.Connection):
 if __name__ == '__main__':
     if platform.system() == 'Darwin':
         mp.set_start_method('spawn')
-    cvae = ConditionalVAE()
+    cvae = cvae.VAE()
     conn_recv, conn_send = mp.Pipe(duplex=False)
-    p_sim = mp.Process(target=simulate, args=(cvae.decoder, conn_send))
-    p_viz = mp.Process(target=visualize, args=(cvae.decoder, conn_recv))
+    p_sim = mp.Process(target=simulate, args=(cvae, conn_send))
+    p_viz = mp.Process(target=visualize, args=(cvae, conn_recv))
     p_sim.start()
     p_viz.start()
     p_sim.join()
