@@ -1,6 +1,6 @@
 """Latent Action Conditional AutoEncoder."""
 
-from typing import List
+from typing import List, Tuple
 
 import torch
 from torch import nn
@@ -9,37 +9,51 @@ from torch.utils.data import DataLoader
 from pytorch_lightning import LightningModule, Trainer, seed_everything
 
 
-class ConditionalVAE(LightningModule):
+class VAE(LightningModule):
 
     def __init__(self, 
+            context_dim: int = 19,
+            action_dim: int = 4,
+            latent_dim: int = 2,
+            enc_dims: Tuple[int] = (3, 2),
+            dec_dims: Tuple[int] = (3, ),
             lr: float = 1e-2, 
             kl_coeff: float = 0.1, 
             p_dropout: float = 0.5):
         super().__init__()
+
+        self.save_hyperparameters()
+        
         self.lr = lr
         self.kl_coeff = kl_coeff
         self.p_dropout = p_dropout
 
-        self.encoder = Encoder()
-        self.decoder = Decoder()
-        self.fc_mu = nn.Linear(4, 2)
-        self.fc_var = nn.Linear(4, 2)
+        self.encoder = nn.Sequential(
+                nn.Linear(action_dim, enc_dims[0]),
+                nn.ReLU(),
+                nn.Linear(enc_dims[0], enc_dims[1]))
+        self.decoder = nn.Sequential(
+                nn.Linear(latent_dim, dec_dims[0]),
+                nn.ReLU(),
+                nn.Linear(dec_dims[0], action_dim))
 
-    def forward(self, 
-            action: torch.Tensor, 
-            context: torch.Tensor, 
-            return_dist: bool = False) -> List[torch.Tensor]:
-        masked_context = F.dropout(
-                context, p=self.p_dropout, training=self.training) 
-        x = self.encoder(action, masked_context)
+        self.fc_mu = nn.Linear(enc_dims[1], latent_dim)
+        self.fc_var = nn.Linear(enc_dims[1], latent_dim)
+
+    def forward(self, *, 
+            latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+        """Inference only. See step() for training."""
+        return self.decoder(latent)
+    
+    def step(self, batch, batch_idx):
+        _, action = batch
+        x = self.encoder(action)
         mu = self.fc_mu(x)
         log_var = self.fc_var(x)
         p, q, z = self.sample(mu, log_var)
-        if return_dist:
-            return self.decoder(z, masked_context), p, q
-        else:
-            return self.decoder(z, masked_context)
-    
+        action_recon = self.decoder(z)
+        return self.compute_vae_loss(action, action_recon, p, q)
+
     def sample(self, mu, log_var):
         std = torch.exp(log_var / 2)
         p = torch.distributions.Normal(
@@ -48,11 +62,8 @@ class ConditionalVAE(LightningModule):
         z = q.rsample()
         return p, q, z
 
-    def step(self, batch, batch_idx):
-        context, action = batch
-        action_hat, p, q = self.forward(action, context, return_dist=True)
-
-        recon_loss = F.mse_loss(action_hat, action, reduction="mean")
+    def compute_vae_loss(self, action, action_recon, p, q):
+        recon_loss = F.mse_loss(action_recon, action, reduction="mean")
 
         kl = torch.distributions.kl_divergence(q, p)
         kl = kl.mean()
@@ -83,34 +94,56 @@ class ConditionalVAE(LightningModule):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
 
 
-class Encoder(nn.Module):
-    
-    def __init__(self):
+class ConditionalVAE(VAE):
+
+    def __init__(self, 
+            context_dim: int = 19,
+            action_dim: int = 4,
+            latent_dim: int = 2,
+            enc_dims: Tuple[int] = (12, 4),
+            dec_dims: Tuple[int] = (12, ),
+            lr: float = 1e-2, 
+            kl_coeff: float = 0.1, 
+            p_dropout: float = 0.5):
         super().__init__()
-        self.fc1 = nn.Linear(23, 12)
-        self.fc2 = nn.Linear(12, 4)
 
-    def forward(self, 
-            action: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
-        x = torch.cat([action, context], dim = 1)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
+        self.save_hyperparameters()
+        
+        self.lr = lr
+        self.kl_coeff = kl_coeff
+        self.p_dropout = p_dropout
 
+        self.encoder = nn.Sequential(
+                nn.Linear(action_dim + context_dim, enc_dims[0]),
+                nn.ReLU(),
+                nn.Linear(enc_dims[0], enc_dims[1]))
+        self.decoder = nn.Sequential(
+                nn.Linear(latent_dim + context_dim, dec_dims[0]),
+                nn.ReLU(),
+                nn.Linear(dec_dims[0], action_dim))
 
-class Decoder(nn.Module):
-    
-    def __init__(self):
-        super().__init__()
-        self.fc1 = nn.Linear(21, 12)
-        self.fc2 = nn.Linear(12, 4)
+        self.fc_mu = nn.Linear(enc_dims[1], latent_dim)
+        self.fc_var = nn.Linear(enc_dims[1], latent_dim)
 
-    def forward(self, 
+    def forward(self, *, 
             latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
-        x = torch.cat([latent, context], dim = 1)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
+        """Inference only. See step() for training."""
+        return self.decoder(latent)
+    
+    def step(self, batch, batch_idx):
+        context, action = batch
+        
+        x = torch.cat([action, context], dim = 1)
+        x = self.encoder(x)
+        
+        mu = self.fc_mu(x)
+        log_var = self.fc_var(x)
+        p, q, z = self.sample(mu, log_var)
+        
+        z = torch.cat([z, context], dim = 1)
+        action_recon = self.decoder(z)
+        return self.compute_vae_loss(action, action_recon, p, q)
+
 
 if __name__ == "__main__":
     from dataset import DemonstrationDataset
