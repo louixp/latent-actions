@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 import multiprocessing as mp
 import platform
 from time import sleep 
@@ -116,15 +117,36 @@ def simulate(decoder, conns: Iterable[mp.connection.Connection]):
     env.close()
 
 if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument(
+            '--model_class', default='VAE', type=str, choices=['VAE', 'cVAE'])
+    parser.add_argument('--checkpoint_path', default=None, type=str)
+    args = parser.parse_args()
+
+    if args.model_class == 'VAE':
+        ModelClass = cvae.VAE
+    else:
+        ModelClass = cvae.ConditionalVAE
+    
+    if args.checkpoint_path is not None:
+        decoder = ModelClass.load_from_checkpoint(args.checkpoint_path)
+        print('Decoder loaded.')
+    else:
+        decoder = ModelClass()
+        print('Random decoder instantiated.')
+    
     if platform.system() == 'Darwin':
         mp.set_start_method('spawn')
-    cvae = cvae.VAE()
+
     conn_recv_1, conn_send_1 = mp.Pipe(duplex=False)
     conn_recv_2, conn_send_2 = mp.Pipe(duplex=False)
-    p_sim = mp.Process(target=simulate, args=(cvae, [conn_send_1, conn_send_2]))
+    p_sim = mp.Process(
+            target=simulate, args=(decoder, [conn_send_1, conn_send_2]))
     p_viz_vec = mp.Process(
-            target=visualize_vector_field, args=(cvae, conn_recv_1))
-    p_viz_man = mp.Process(target=visualize_manifold, args=(cvae, conn_recv_2))
+            target=visualize_vector_field, args=(decoder, conn_recv_1))
+    p_viz_man = mp.Process(
+            target=visualize_manifold, args=(decoder, conn_recv_2))
+
     p_sim.start()
     p_viz_vec.start()
     p_viz_man.start()
