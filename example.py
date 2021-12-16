@@ -41,9 +41,12 @@ def visualize_manifold(decoder, conn: mp.connection.Connection):
         u, v, w = np.split(decoded_actions, 3, axis=-1) 
         sc = ax.scatter(u, v, w, c=norm)
 
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
+    fig = plt.figure(figsize=plt.figaspect(0.5))
+    ax = fig.add_subplot(1, 2, 1, projection='3d')
+    ax_ref = fig.add_subplot(1, 2, 2)
     ax.set_title('Decodable Action Manifold')
+    ax_ref.set_title('Reference Latent Manifold')
+    ax_ref.scatter(x, y, c=norm)
     ani = FuncAnimation(fig, plot_function, interval=1)
     plt.show()
 
