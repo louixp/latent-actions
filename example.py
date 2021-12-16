@@ -25,6 +25,7 @@ def visualize_manifold(decoder, conn: mp.connection.Connection):
     latent_actions = np.concatenate((x, y), axis=-1)
     latent_actions = torch.from_numpy(latent_actions.reshape((-1, 2))).float() 
     latent_actions *= ACTION_SCALE
+    norm = np.linalg.norm(latent_actions, axis=-1)
 
     def plot_function(i):
         ax.cla() 
@@ -36,7 +37,6 @@ def visualize_manifold(decoder, conn: mp.connection.Connection):
         decoded_actions = decoder(latent=latent_actions, context=contexts)
         decoded_actions = decoded_actions.detach().numpy()[:, :3]
         decoded_actions = decoded_actions.reshape((x.shape[0], x.shape[1], 3))
-        norm = np.linalg.norm(decoded_actions, axis=-1)
 
         u, v, w = np.split(decoded_actions, 3, axis=-1) 
         sc = ax.scatter(u, v, w, c=norm)
