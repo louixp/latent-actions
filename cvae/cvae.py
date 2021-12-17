@@ -189,6 +189,6 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
 
     model = ModelClass(**vars(args))
-    wandb_logger = WandbLogger(project="latent-action")
+    wandb_logger = WandbLogger(project="latent-action", entity="ucla-ncel-robotics")
     trainer = Trainer(logger=wandb_logger)
     trainer.fit(model, train_loader, test_loader)
