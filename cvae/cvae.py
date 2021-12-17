@@ -128,14 +128,14 @@ class ConditionalVAE(VAE):
         self.lr = lr
         self.kl_coeff = kl_coeff
         
-        enc_dims = [action_dim] + list(enc_dims)
+        enc_dims = [action_dim + context_dim] + list(enc_dims)
         enc_layers = [
                 layer for d_in, d_out in zip(enc_dims[:-1], enc_dims[1:])
                 for layer in [nn.Linear(d_in, d_out), nn.ReLU()]]
         enc_layers.pop()
         self.encoder = nn.Sequential(*enc_layers)
 
-        dec_dims = [latent_dim] + list(dec_dims) + [action_dim]
+        dec_dims = [latent_dim + context_dim] + list(dec_dims) + [action_dim]
         dec_layers = [
                 layer for d_in, d_out in zip(dec_dims[:-1], dec_dims[1:])
                 for layer in [nn.Linear(d_in, d_out), nn.ReLU()]]
