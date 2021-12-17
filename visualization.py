@@ -19,9 +19,10 @@ def visualize_latent_actions_in_3d(
             [int, cvae.VAE, mp.connection.Connection, matplotlib.axes.Axes, 
                 np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray], 
             None],
-        action_scale: int):
-    x, y, z = np.meshgrid(np.arange(-action_scale, action_scale, 1),
-                          np.arange(-action_scale, action_scale, 1),
+        action_scale: int,
+        grid_step: int):
+    x, y, z = np.meshgrid(np.arange(-action_scale, action_scale, grid_step),
+                          np.arange(-action_scale, action_scale, grid_step),
                           0)
     latent_actions = np.concatenate((x, y), axis=-1)
     latent_actions = torch.from_numpy(latent_actions.reshape((-1, 2))).float() 

@@ -80,11 +80,11 @@ if __name__ == '__main__':
     p_viz_vec = mp.Process(
             target=visualization.visualize_latent_actions_in_3d, 
             args=(decoder, conn_recv_1, visualization.plot_vector_field, 
-                args.action_scale))
+                args.action_scale, 2))
     p_viz_man = mp.Process(
             target=visualization.visualize_latent_actions_in_3d, 
             args=(decoder, conn_recv_2, visualization.plot_manifold,
-                args.action_scale))
+                args.action_scale, 1))
 
     p_sim.start()
     p_viz_vec.start()
