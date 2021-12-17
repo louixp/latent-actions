@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 import multiprocessing as mp
 import platform
+import sys
 from time import sleep 
 from typing import Iterable
 
@@ -15,10 +16,11 @@ import panda_gym
 from cvae import cvae 
 from controller import Controller
 
-DEBUG = False 
 ACTION_SCALE = 10
 
-def visualize_manifold(decoder, conn: mp.connection.Connection):
+def visualize_manifold(
+        decoder: cvae.VAE, 
+        conn: mp.connection.Connection):
     x, y, z = np.meshgrid(np.arange(-ACTION_SCALE, ACTION_SCALE, 1),
                           np.arange(-ACTION_SCALE, ACTION_SCALE, 1),
                           0)
@@ -29,8 +31,12 @@ def visualize_manifold(decoder, conn: mp.connection.Connection):
 
     def plot_function(i):
         ax.cla() 
-
-        prev_action, context = conn.recv()        
+        
+        try:
+            prev_action, context = conn.recv()        
+        except:
+            print('Manifold visualization exiting')
+            sys.exit()
         prev_action = prev_action.numpy()[0]
         contexts = context.expand(latent_actions.shape[0], context.shape[1])
 
@@ -50,7 +56,10 @@ def visualize_manifold(decoder, conn: mp.connection.Connection):
     ani = FuncAnimation(fig, plot_function, interval=1)
     plt.show()
 
-def visualize_vector_field(decoder, conn: mp.connection.Connection):
+
+def visualize_vector_field(
+        decoder: cvae.VAE, 
+        conn: mp.connection.Connection):
     x, y, z = np.meshgrid(np.arange(-ACTION_SCALE, ACTION_SCALE, 2),
                           np.arange(-ACTION_SCALE, ACTION_SCALE, 2),
                           0)
@@ -60,8 +69,12 @@ def visualize_vector_field(decoder, conn: mp.connection.Connection):
 
     def plot_function(i):
         ax.cla() 
-
-        prev_action, context = conn.recv()        
+        
+        try:
+            prev_action, context = conn.recv()        
+        except Exception as e:
+            print('Vector field visualization exiting')
+            sys.exit()
         prev_action = prev_action.numpy()[0]
         contexts = context.expand(latent_actions.shape[0], context.shape[1])
 
@@ -71,16 +84,6 @@ def visualize_vector_field(decoder, conn: mp.connection.Connection):
 
         u, v, w = np.split(decoded_actions, 3, axis=-1) 
         ax.quiver(x, y, z, u, v, w, normalize=True)
-
-        if DEBUG:
-            decoded_actions_ref = decoder(
-                    latent=torch.zeros_like(latent_actions), 
-                    context=torch.zeros_like(contexts))
-            decoded_actions_ref = decoded_actions_ref.detach().numpy()[:, :3]
-            decoded_actions_ref = decoded_actions_ref.reshape(
-                    (x.shape[0], x.shape[1], 3))
-            u_ref, v_ref, w_ref = np.split(decoded_actions_ref, 3, axis=-1) 
-            ax.quiver(x, y, z, u_ref, v_ref, w_ref, color='lime', normalize=True)
 
         # Controller/latent current posistion.
         ax.plot(*prev_action, 'ro')
@@ -96,7 +99,10 @@ def visualize_vector_field(decoder, conn: mp.connection.Connection):
     ani = FuncAnimation(fig, plot_function, interval=1)
     plt.show()
 
-def simulate(decoder, conns: Iterable[mp.connection.Connection]):
+
+def simulate(
+        decoder: cvae.VAE, 
+        conns: Iterable[mp.connection.Connection]):
     controller = Controller(scale=ACTION_SCALE)
 
     env = gym.make('PandaPickAndPlace-v1', render=True).env
@@ -104,7 +110,14 @@ def simulate(decoder, conns: Iterable[mp.connection.Connection]):
 
     done = False
     while not done:
-        latent_action = controller.get_action()
+        try:
+            latent_action = controller.get_action()
+        except Exception as e:
+            print('Simulation exiting...')
+            for conn in conns:
+                conn.send(None)
+            return
+
         context = torch.from_numpy(obs['observation'])
         context = torch.unsqueeze(context, 0).float()
         for conn in conns:
@@ -118,6 +131,7 @@ def simulate(decoder, conns: Iterable[mp.connection.Connection]):
         sleep(0.1)
 
     env.close()
+
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -143,10 +157,13 @@ if __name__ == '__main__':
 
     conn_recv_1, conn_send_1 = mp.Pipe(duplex=False)
     conn_recv_2, conn_send_2 = mp.Pipe(duplex=False)
+
     p_sim = mp.Process(
-            target=simulate, args=(decoder, [conn_send_1, conn_send_2]))
+            target=simulate, 
+            args=(decoder, [conn_send_1, conn_send_2]))
     p_viz_vec = mp.Process(
-            target=visualize_vector_field, args=(decoder, conn_recv_1))
+            target=visualize_vector_field, 
+            args=(decoder, conn_recv_1))
     p_viz_man = mp.Process(
             target=visualize_manifold, args=(decoder, conn_recv_2))
 
