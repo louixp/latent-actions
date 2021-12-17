@@ -28,18 +28,23 @@ class VAE(LightningModule):
         
         self.lr = lr
         self.kl_coeff = kl_coeff
+        
+        enc_dims = [action_dim] + list(enc_dims)
+        enc_layers = [
+                layer for d_in, d_out in zip(enc_dims[:-1], enc_dims[1:])
+                for layer in [nn.Linear(d_in, d_out), nn.ReLU()]]
+        enc_layers.pop()
+        self.encoder = nn.Sequential(*enc_layers)
 
-        self.encoder = nn.Sequential(
-                nn.Linear(action_dim, enc_dims[0]),
-                nn.ReLU(),
-                nn.Linear(enc_dims[0], enc_dims[1]))
-        self.decoder = nn.Sequential(
-                nn.Linear(latent_dim, dec_dims[0]),
-                nn.ReLU(),
-                nn.Linear(dec_dims[0], action_dim))
+        dec_dims = [latent_dim] + list(dec_dims) + [action_dim]
+        dec_layers = [
+                layer for d_in, d_out in zip(dec_dims[:-1], dec_dims[1:])
+                for layer in [nn.Linear(d_in, d_out), nn.ReLU()]]
+        dec_layers.pop()
+        self.decoder = nn.Sequential(*dec_layers)
 
-        self.fc_mu = nn.Linear(enc_dims[1], latent_dim)
-        self.fc_var = nn.Linear(enc_dims[1], latent_dim)
+        self.fc_mu = nn.Linear(enc_dims[-1], latent_dim)
+        self.fc_var = nn.Linear(enc_dims[-1], latent_dim)
 
     def forward(self, *, 
             latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
@@ -122,18 +127,23 @@ class ConditionalVAE(VAE):
         
         self.lr = lr
         self.kl_coeff = kl_coeff
+        
+        enc_dims = [action_dim] + list(enc_dims)
+        enc_layers = [
+                layer for d_in, d_out in zip(enc_dims[:-1], enc_dims[1:])
+                for layer in [nn.Linear(d_in, d_out), nn.ReLU()]]
+        enc_layers.pop()
+        self.encoder = nn.Sequential(*enc_layers)
 
-        self.encoder = nn.Sequential(
-                nn.Linear(action_dim + context_dim, enc_dims[0]),
-                nn.ReLU(),
-                nn.Linear(enc_dims[0], enc_dims[1]))
-        self.decoder = nn.Sequential(
-                nn.Linear(latent_dim + context_dim, dec_dims[0]),
-                nn.ReLU(),
-                nn.Linear(dec_dims[0], action_dim))
+        dec_dims = [latent_dim] + list(dec_dims) + [action_dim]
+        dec_layers = [
+                layer for d_in, d_out in zip(dec_dims[:-1], dec_dims[1:])
+                for layer in [nn.Linear(d_in, d_out), nn.ReLU()]]
+        dec_layers.pop()
+        self.decoder = nn.Sequential(*dec_layers)
 
-        self.fc_mu = nn.Linear(enc_dims[1], latent_dim)
-        self.fc_var = nn.Linear(enc_dims[1], latent_dim)
+        self.fc_mu = nn.Linear(enc_dims[-1], latent_dim)
+        self.fc_var = nn.Linear(enc_dims[-1], latent_dim)
 
     def forward(self, *, 
             latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
@@ -162,7 +172,7 @@ if __name__ == "__main__":
             "--model_class", default="VAE", type=str, choices=["VAE", "cVAE"])
     script_args, _ = parser.parse_known_args()
     if script_args.model_class == "VAE":
-        ModelClass = VAE 
+        ModelClass = VAE
     else:
         ModelClass = ConditionalVAE
 
@@ -177,7 +187,7 @@ if __name__ == "__main__":
             dataset, [int(len(dataset) * .8), int(len(dataset) * .2)])
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
-    
+
     model = ModelClass(**vars(args))
     wandb_logger = WandbLogger(project="latent-action")
     trainer = Trainer(logger=wandb_logger)
