@@ -11,7 +11,6 @@ import torch
 
 from cvae import cvae 
 
-ACTION_SCALE = 10
 
 def visualize_latent_actions_in_3d(
         decoder: cvae.VAE, 
@@ -19,13 +18,14 @@ def visualize_latent_actions_in_3d(
         plot_function: Callable[
             [int, cvae.VAE, mp.connection.Connection, matplotlib.axes.Axes, 
                 np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray], 
-            None]):
-    x, y, z = np.meshgrid(np.arange(-ACTION_SCALE, ACTION_SCALE, 1),
-                          np.arange(-ACTION_SCALE, ACTION_SCALE, 1),
+            None],
+        action_scale: int):
+    x, y, z = np.meshgrid(np.arange(-action_scale, action_scale, 1),
+                          np.arange(-action_scale, action_scale, 1),
                           0)
     latent_actions = np.concatenate((x, y), axis=-1)
     latent_actions = torch.from_numpy(latent_actions.reshape((-1, 2))).float() 
-    latent_actions *= ACTION_SCALE
+    latent_actions *= action_scale
     norm = np.linalg.norm(latent_actions, axis=-1)
 
     fig = plt.figure()

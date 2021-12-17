@@ -14,12 +14,11 @@ from controller import Controller
 import visualization
 
 
-ACTION_SCALE = 10
-
 def simulate(
         decoder: cvae.VAE, 
-        conns: Iterable[mp.connection.Connection]):
-    controller = Controller(scale=ACTION_SCALE)
+        conns: Iterable[mp.connection.Connection],
+        action_scale: int):
+    controller = Controller(scale=action_scale)
 
     env = gym.make('PandaPickAndPlace-v1', render=True).env
     obs = env.reset()
@@ -54,6 +53,7 @@ if __name__ == '__main__':
     parser.add_argument(
             '--model_class', default='VAE', type=str, choices=['VAE', 'cVAE'])
     parser.add_argument('--checkpoint_path', default=None, type=str)
+    parser.add_argument('--action_scale', default=10, type=int)
     args = parser.parse_args()
 
     if args.model_class == 'VAE':
@@ -76,13 +76,15 @@ if __name__ == '__main__':
 
     p_sim = mp.Process(
             target=simulate, 
-            args=(decoder, [conn_send_1, conn_send_2]))
+            args=(decoder, [conn_send_1, conn_send_2], args.action_scale))
     p_viz_vec = mp.Process(
             target=visualization.visualize_latent_actions_in_3d, 
-            args=(decoder, conn_recv_1, visualization.plot_vector_field))
+            args=(decoder, conn_recv_1, visualization.plot_vector_field, 
+                args.action_scale))
     p_viz_man = mp.Process(
             target=visualization.visualize_latent_actions_in_3d, 
-            args=(decoder, conn_recv_2, visualization.plot_manifold))
+            args=(decoder, conn_recv_2, visualization.plot_manifold,
+                args.action_scale))
 
     p_sim.start()
     p_viz_vec.start()
