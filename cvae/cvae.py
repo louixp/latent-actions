@@ -20,6 +20,7 @@ class VAE(LightningModule):
             lr: float,
             kl_coeff: float,
             kl_schedule: str = "constant",
+            activation: str = "relu",
             context_dim: int = 19,
             action_dim: int = 4,
             **kwargs):
@@ -31,17 +32,22 @@ class VAE(LightningModule):
         self.kl_coeff = kl_coeff
         self.kl_schedule = kl_schedule 
         
+        if activation == "tanh":
+            self.Activation = nn.Tanh
+        else:
+            self.Activation = nn.ReLU
+        
         enc_dims = [action_dim] + list(enc_dims)
         enc_layers = [
                 layer for d_in, d_out in zip(enc_dims[:-1], enc_dims[1:])
-                for layer in [nn.Linear(d_in, d_out), nn.ReLU()]]
+                for layer in [nn.Linear(d_in, d_out), self.Activation()]]
         enc_layers.pop()
         self.encoder = nn.Sequential(*enc_layers)
 
         dec_dims = [latent_dim] + list(dec_dims) + [action_dim]
         dec_layers = [
                 layer for d_in, d_out in zip(dec_dims[:-1], dec_dims[1:])
-                for layer in [nn.Linear(d_in, d_out), nn.ReLU()]]
+                for layer in [nn.Linear(d_in, d_out), self.Activation()]]
         dec_layers.pop()
         self.decoder = nn.Sequential(*dec_layers)
 
@@ -120,6 +126,9 @@ class VAE(LightningModule):
     def add_model_specific_args(parent_parser):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
         parser.add_argument("--lr", type=float, default=1e-4)
+        parser.add_argument(
+                "--activation", type=str, default="relu", 
+                choices=["tanh", "relu"])
 
         parser.add_argument(
                 "--kl_schedule", type=str, default="cyclical", 
@@ -144,6 +153,7 @@ class ConditionalVAE(VAE):
             lr: float, 
             kl_coeff: float,
             kl_schedule: str = "constant",
+            activation: str = "relu",
             context_dim: int = 19,
             action_dim: int = 4,
             **kwargs): 
@@ -154,20 +164,21 @@ class ConditionalVAE(VAE):
                 lr=lr,
                 kl_coeff=kl_coeff,
                 kl_schedule=kl_schedule,
+                activation=activation,
                 context_dim=context_dim,
                 action_dim=action_dim)
         
         enc_dims = [action_dim + context_dim] + list(enc_dims)
         enc_layers = [
                 layer for d_in, d_out in zip(enc_dims[:-1], enc_dims[1:])
-                for layer in [nn.Linear(d_in, d_out), nn.ReLU()]]
+                for layer in [nn.Linear(d_in, d_out), self.Activation()]]
         enc_layers.pop()
         self.encoder = nn.Sequential(*enc_layers)
 
         dec_dims = [latent_dim + context_dim] + list(dec_dims) + [action_dim]
         dec_layers = [
                 layer for d_in, d_out in zip(dec_dims[:-1], dec_dims[1:])
-                for layer in [nn.Linear(d_in, d_out), nn.ReLU()]]
+                for layer in [nn.Linear(d_in, d_out), self.Activation()]]
         dec_layers.pop()
         self.decoder = nn.Sequential(*dec_layers)
 
@@ -213,10 +224,12 @@ if __name__ == "__main__":
             dataset, [int(len(dataset) * .8), int(len(dataset) * .2)])
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
-    
+   
     wandb_logger = WandbLogger(project="latent-action", entity="ucla-ncel-robotics")
     trainer = Trainer(logger=wandb_logger)
         
     model = ModelClass(**vars(args))
     model.set_kl_scheduler(n_steps=trainer.max_epochs*len(train_loader)) 
+    print(model)
+
     trainer.fit(model, train_loader, test_loader)
