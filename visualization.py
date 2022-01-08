@@ -20,7 +20,8 @@ def visualize_latent_actions_in_3d(
                 np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray], 
             None],
         action_scale: int,
-        grid_step: int):
+        grid_size: int):
+    grid_step = action_scale // grid_size
     x, y, z = np.meshgrid(np.arange(-action_scale, action_scale, grid_step),
                           np.arange(-action_scale, action_scale, grid_step),
                           0)
@@ -33,7 +34,8 @@ def visualize_latent_actions_in_3d(
     ax = fig.gca(projection='3d')
     ani = FuncAnimation(
             fig, plot_function, 
-            fargs=(decoder, conn, ax, latent_actions, x, y, z, norm),
+            fargs=(decoder, conn, ax, latent_actions, x, y, z, norm, 
+                action_scale),
             interval=1)
     plt.show()
 
@@ -44,7 +46,8 @@ def plot_manifold(
         conn: mp.connection.Connection,
         ax: matplotlib.axes.Axes, 
         latent_actions: np.ndarray,
-        x: np.ndarray, y: np.ndarray, z: np.ndarray, c: np.ndarray):
+        x: np.ndarray, y: np.ndarray, z: np.ndarray, c: np.ndarray,
+        action_scale: int):
     ax.cla() 
     
     try:
@@ -65,7 +68,8 @@ def plot_vector_field(
         conn: mp.connection.Connection,
         ax: matplotlib.axes.Axes, 
         latent_actions: np.ndarray,
-        x: np.ndarray, y: np.ndarray, z: np.ndarray, c: np.ndarray):
+        x: np.ndarray, y: np.ndarray, z: np.ndarray, c: np.ndarray,
+        action_scale: int):
     ax.cla() 
     
     try:
@@ -78,13 +82,16 @@ def plot_vector_field(
     decoded_actions = _decode_latent_actions(
             decoder, latent_actions, contexts, x)
     u, v, w = np.split(decoded_actions, 3, axis=-1) 
-    ax.quiver(x, y, z, u, v, w, normalize=True)
+    length = np.sqrt(u**2 + v**2 + w**2)
+    scale = action_scale / 10
+    u, v, w = u/length*scale, v/length*scale, w/length*scale
+    ax.quiver(x, y, z, u, v, w)
 
     # Controller/latent current posistion.
     ax.plot(*prev_action, 'ro')
     # Small hacks to 'equalize' axes since matplotlib doesn't support it.
-    ax.plot(0, 0, 2.5, alpha=0)
-    ax.plot(0, 0, -2.5, alpha=0)
+    ax.plot(0, 0, action_scale // 2, alpha=0)
+    ax.plot(0, 0, -action_scale // 2, alpha=0)
 
 
 def _decode_latent_actions(decoder, latent_actions, contexts, x):
