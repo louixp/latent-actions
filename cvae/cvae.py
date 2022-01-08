@@ -9,6 +9,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from pytorch_lightning import LightningModule, Trainer, seed_everything
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.utilities import ModelSummary
 
 
 class VAE(LightningModule):
@@ -230,6 +231,11 @@ if __name__ == "__main__":
         
     model = ModelClass(**vars(args))
     model.set_kl_scheduler(n_steps=trainer.max_epochs*len(train_loader)) 
+    
     print(model)
-
+    model_summary = ModelSummary(model)
+    wandb_logger.log_hyperparams({
+        "total_parameters": model_summary.total_parameters,
+        "trainable_parameters": model_summary.trainable_parameters})
+    
     trainer.fit(model, train_loader, test_loader)
