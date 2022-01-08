@@ -9,7 +9,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from pytorch_lightning import LightningModule, Trainer, seed_everything
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.utilities import ModelSummary
+from pytorch_lightning.utilities.model_summary import ModelSummary
 
 
 class VAE(LightningModule):
