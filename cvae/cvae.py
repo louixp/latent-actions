@@ -206,12 +206,9 @@ class ConditionalVAE(VAE):
         action_recon = self.decoder(x_dec)
         
         loss, logs = self.compute_vae_loss(action, action_recon, p, q, kl_coeff)
-        if self.fixed_point_coeff > 0:
-            fixed_point_loss = (
-                    self.fixed_point_coeff * self.fixed_point_constraint(
-                    context, z))
-            logs["fixed_point_loss"] = fixed_point_loss
-            loss += fixed_point_loss
+        fixed_point_loss = self.fixed_point_constraint(context, z)
+        logs["fixed_point_loss"] = fixed_point_loss
+        loss += self.fixed_point_coeff * fixed_point_loss
         return loss, logs
 
     def fixed_point_constraint(self, context, z):
