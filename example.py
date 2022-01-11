@@ -17,7 +17,8 @@ import visualization
 def simulate(
         decoder: cvae.VAE, 
         conns: Iterable[mp.connection.Connection],
-        action_scale: int):
+        action_scale: int,
+        step_rate: float):
     controller = Controller(scale=action_scale)
 
     env = gym.make('PandaPickAndPlace-v1', render=True).env
@@ -43,7 +44,7 @@ def simulate(
         action = np.squeeze(action)
 
         obs, reward, done, info = env.step(action)
-        sleep(0.1)
+        sleep(step_rate)
 
     env.close()
 
@@ -54,6 +55,7 @@ if __name__ == '__main__':
             '--model_class', default='VAE', type=str, choices=['VAE', 'cVAE'])
     parser.add_argument('--checkpoint_path', default=None, type=str)
     parser.add_argument('--action_scale', default=10, type=int)
+    parser.add_argument('--step_rate', default=0.1, type=float)
     args = parser.parse_args()
 
     if args.model_class == 'VAE':
@@ -76,7 +78,9 @@ if __name__ == '__main__':
 
     p_sim = mp.Process(
             target=simulate, 
-            args=(decoder, [conn_send_1, conn_send_2], args.action_scale))
+            args=(
+                decoder, [conn_send_1, conn_send_2], args.action_scale, 
+                args.step_rate))
     p_viz_vec = mp.Process(
             target=visualization.visualize_latent_actions_in_3d, 
             args=(decoder, conn_recv_1, visualization.plot_vector_field, 
