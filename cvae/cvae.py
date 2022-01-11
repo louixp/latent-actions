@@ -157,6 +157,7 @@ class ConditionalVAE(VAE):
             activation: str = "relu",
             context_dim: int = 19,
             action_dim: int = 4,
+            fixed_point_coeff: int = 0,
             **kwargs): 
         super().__init__(
                 latent_dim=latent_dim, 
@@ -183,6 +184,8 @@ class ConditionalVAE(VAE):
         dec_layers.pop()
         self.decoder = nn.Sequential(*dec_layers)
 
+        self.fixed_point_coeff = fixed_point_coeff
+
     def forward(self, *, 
             latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         """Inference only. See step() for training."""
@@ -199,10 +202,30 @@ class ConditionalVAE(VAE):
         log_var = self.fc_var(x)
         p, q, z = self.sample(mu, log_var)
         
-        z = torch.cat([z, context], dim = 1)
-        action_recon = self.decoder(z)
-        return self.compute_vae_loss(action, action_recon, p, q, kl_coeff)
+        x_dec = torch.cat([z, context], dim = 1)
+        action_recon = self.decoder(x_dec)
+        
+        loss, logs = self.compute_vae_loss(action, action_recon, p, q, kl_coeff)
+        if self.fixed_point_coeff > 0:
+            fixed_point_loss = (
+                    self.fixed_point_coeff * self.fixed_point_constraint(
+                    context, z))
+            logs["fixed_point_loss"] = fixed_point_loss
+            loss += fixed_point_loss
+        return loss, logs
 
+    def fixed_point_constraint(self, context, z):
+        zero = torch.zeros_like(z)
+        x_dec = torch.cat([zero, context], dim = 1)
+        action_zero = self.decoder(x_dec)
+        return torch.linalg.norm(action_zero)
+
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = super(ConditionalVAE, ConditionalVAE).add_model_specific_args(
+                parent_parser)
+        parser.add_argument("--fixed_point_coeff", type=float, default=0)
+        return parser
 
 if __name__ == "__main__":
     parser = ArgumentParser()
