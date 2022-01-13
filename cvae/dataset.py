@@ -52,5 +52,5 @@ class DemonstrationDataset(Dataset):
     @staticmethod
     def add_dataset_specific_args(parent_parser):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--include_goal", type=bool, default=False)
+        parser.add_argument("--include_goal", action="store_true")
         return parser

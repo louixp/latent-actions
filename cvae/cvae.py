@@ -225,6 +225,8 @@ class ConditionalVAE(VAE):
         return parser
 
 if __name__ == "__main__":
+    from dataset import DemonstrationDataset
+
     parser = ArgumentParser()
     parser.add_argument(
             "--model_class", default="cVAE", type=str, choices=["VAE", "cVAE"])
@@ -235,12 +237,12 @@ if __name__ == "__main__":
         ModelClass = ConditionalVAE
 
     parser.add_argument("--batch_size", type=int, default=32)
+    parser = DemonstrationDataset.add_dataset_specific_args(parser)
     parser = ModelClass.add_model_specific_args(parser)
     args = parser.parse_args()
 
-    from dataset import DemonstrationDataset
     dataset = DemonstrationDataset.from_baselines_rl_zoo(
-            "../../rl-baselines3-zoo/demonstration.pkl")
+            "../../rl-baselines3-zoo/demonstration.pkl", args.include_goal)
     train_set, test_set = torch.utils.data.random_split(
             dataset, [int(len(dataset) * .8), int(len(dataset) * .2)])
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
@@ -249,7 +251,10 @@ if __name__ == "__main__":
     wandb_logger = WandbLogger(project="latent-action", entity="ucla-ncel-robotics")
     trainer = Trainer(logger=wandb_logger)
         
-    model = ModelClass(**vars(args))
+    model = ModelClass(
+            context_dim=dataset.get_context_dim(), 
+            action_dim=dataset.get_action_dim(), 
+            **vars(args))
     model.set_kl_scheduler(n_steps=trainer.max_epochs*len(train_loader)) 
     
     print(model)
