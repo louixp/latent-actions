@@ -35,6 +35,9 @@ def simulate(
             return
 
         context = torch.from_numpy(obs['observation'])
+        if decoder.hparams.get('include_goal'):
+            goal = torch.from_numpy(obs['desired_goal'])
+            context = torch.cat((context, goal))
         context = torch.unsqueeze(context, 0).float()
         for conn in conns:
             conn.send((latent_action, context))
