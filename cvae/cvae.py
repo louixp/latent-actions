@@ -237,6 +237,9 @@ if __name__ == "__main__":
         ModelClass = ConditionalVAE
 
     parser.add_argument("--batch_size", type=int, default=32)
+    # NOTE: Trainer.add_argparse_args(parser) kind of pollutes the 
+    #   hyperparameter space.
+    parser.add_argument("--max_epochs", type=int, default=400)
     parser = DemonstrationDataset.add_dataset_specific_args(parser)
     parser = ModelClass.add_model_specific_args(parser)
     args = parser.parse_args()
@@ -249,7 +252,7 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
    
     wandb_logger = WandbLogger(project="latent-action", entity="ucla-ncel-robotics")
-    trainer = Trainer(logger=wandb_logger)
+    trainer = Trainer(max_epochs=args.max_epochs, logger=wandb_logger)
         
     model = ModelClass(
             context_dim=dataset.get_context_dim(), 
