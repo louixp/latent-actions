@@ -158,6 +158,7 @@ class ConditionalVAE(VAE):
             context_dim: int = 19,
             action_dim: int = 4,
             fixed_point_coeff: int = 0,
+            dropout: float = 0,
             **kwargs): 
         super().__init__(
                 latent_dim=latent_dim, 
@@ -169,6 +170,8 @@ class ConditionalVAE(VAE):
                 activation=activation,
                 context_dim=context_dim,
                 action_dim=action_dim)
+
+        self.dropout = nn.Dropout(dropout)
         
         enc_dims = [action_dim + context_dim] + list(enc_dims)
         enc_layers = [
@@ -194,6 +197,7 @@ class ConditionalVAE(VAE):
     
     def step(self, batch, batch_idx, kl_coeff):
         context, action = batch
+        context = self.dropout(context)
         
         x = torch.cat([action, context], dim = 1)
         x = self.encoder(x)
@@ -222,6 +226,7 @@ class ConditionalVAE(VAE):
         parser = super(ConditionalVAE, ConditionalVAE).add_model_specific_args(
                 parent_parser)
         parser.add_argument("--fixed_point_coeff", type=float, default=0)
+        parser.add_argument("--dropout", type=float, default=0)
         return parser
 
 if __name__ == "__main__":
