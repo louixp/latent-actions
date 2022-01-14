@@ -257,7 +257,9 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
    
     wandb_logger = WandbLogger(project="latent-action", entity="ucla-ncel-robotics")
-    trainer = Trainer(max_epochs=args.max_epochs, logger=wandb_logger)
+    trainer = Trainer(
+            logger=wandb_logger, auto_select_gpus=True,
+            max_epochs=args.max_epochs)
         
     model = ModelClass(
             context_dim=dataset.get_context_dim(), 
