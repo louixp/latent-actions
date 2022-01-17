@@ -8,6 +8,7 @@ from pytorch_lightning.utilities.model_summary import ModelSummary
 
 from cvae.vae import VAE
 from cvae.cvae import ConditionalVAE
+from cvae.gbc import GaussianBC 
 from cvae.dataset import DemonstrationDataset
 
 parser = ArgumentParser()
