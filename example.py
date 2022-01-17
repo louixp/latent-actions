@@ -9,13 +9,13 @@ import torch
 import gym
 import panda_gym
 
-from cvae import cvae 
+from cvae import vae, cvae, gbc 
 from controller import Controller
 import visualization
 
 
 def simulate(
-        decoder: cvae.VAE, 
+        decoder: vae.VAE, 
         conns: Iterable[mp.connection.Connection],
         action_scale: int,
         step_rate: float):
@@ -55,14 +55,17 @@ def simulate(
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument(
-            '--model_class', default='VAE', type=str, choices=['VAE', 'cVAE'])
+            '--model_class', default='VAE', type=str, 
+            choices=['VAE', 'cVAE', 'gBC'])
     parser.add_argument('--checkpoint_path', default=None, type=str)
     parser.add_argument('--action_scale', default=10, type=int)
     parser.add_argument('--step_rate', default=0.1, type=float)
     args = parser.parse_args()
 
     if args.model_class == 'VAE':
-        ModelClass = cvae.VAE
+        ModelClass = vae.VAE
+    elif args.model_class == 'gBC':
+        ModelClass = gbc.GaussianBC
     else:
         ModelClass = cvae.ConditionalVAE
     

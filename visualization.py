@@ -9,14 +9,14 @@ from matplotlib.animation import FuncAnimation
 import numpy as np
 import torch
 
-from cvae import cvae 
+from cvae import vae 
 
 
 def visualize_latent_actions_in_3d(
-        decoder: cvae.VAE, 
+        decoder: vae.VAE, 
         conn: mp.connection.Connection,
         plot_function: Callable[
-            [int, cvae.VAE, mp.connection.Connection, matplotlib.axes.Axes, 
+            [int, vae.VAE, mp.connection.Connection, matplotlib.axes.Axes, 
                 np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray], 
             None],
         action_scale: int,
@@ -42,7 +42,7 @@ def visualize_latent_actions_in_3d(
 
 def plot_manifold(
         frame: int, 
-        decoder: cvae.VAE, 
+        decoder: vae.VAE, 
         conn: mp.connection.Connection,
         ax: matplotlib.axes.Axes, 
         latent_actions: np.ndarray,
@@ -64,7 +64,7 @@ def plot_manifold(
 
 def plot_vector_field(
         frame: int, 
-        decoder: cvae.VAE, 
+        decoder: vae.VAE, 
         conn: mp.connection.Connection,
         ax: matplotlib.axes.Axes, 
         latent_actions: np.ndarray,
