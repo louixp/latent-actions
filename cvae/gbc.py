@@ -52,7 +52,8 @@ class GaussianBC(cvae.ConditionalVAE):
         loss = recon_loss + self.fixed_point_coeff * fixed_point_loss
         logs = {
                 "recon_loss": recon_loss,
-                "fixed_point_loss": fixed_point_loss}
+                "fixed_point_loss": fixed_point_loss,
+                "loss": loss}
         return loss, logs
 
     def training_step(self, batch, batch_idx):
