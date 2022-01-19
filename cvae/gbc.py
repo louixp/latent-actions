@@ -5,10 +5,10 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from . import cvae
+from . import cae
 
 
-class GaussianBC(cvae.ConditionalVAE):
+class GaussianBC(cae.ConditionalAE):
 
     def __init__(self, 
             latent_dim: int,
@@ -31,10 +31,7 @@ class GaussianBC(cvae.ConditionalVAE):
                 context_dim=context_dim,
                 action_dim=action_dim)
         
-        # NOTE: Only keep the conditional decoder
         del self.encoder
-        del self.fc_mu
-        del self.fc_var
     
     def step(self, batch, batch_idx):
         context, action = batch
@@ -56,14 +53,3 @@ class GaussianBC(cvae.ConditionalVAE):
                 "loss": loss}
         return loss, logs
 
-    def training_step(self, batch, batch_idx):
-        loss, logs = self.step(batch, batch_idx)
-        self.log_dict(
-            {f"train_{k}": v for k, v in logs.items()}, on_step=True, 
-            on_epoch=False)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        loss, logs = self.step(batch, batch_idx)
-        self.log_dict({f"val_{k}": v for k, v in logs.items()})
-        return loss
