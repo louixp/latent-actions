@@ -55,7 +55,7 @@ class AlignedDecoder(LightningModule):
         action_recon = self.decoder(z)
         
         loss = F.mse_loss(action_recon, action, reduction="mean")
-        logs = {"algin_loss": loss}
+        logs = {"align_loss": loss}
         return loss, logs
 
     def training_step(self, batch, batch_idx):
