@@ -9,7 +9,7 @@ import torch
 import gym
 import panda_gym
 
-from cvae import vae, cvae, gbc 
+from cvae import vae, cvae, gbc, aligned_decoder 
 from controller import Controller
 import visualization
 
@@ -54,9 +54,10 @@ def simulate(
 
 if __name__ == '__main__':
     parser = ArgumentParser()
+    # TODO: Figure out a better way to write this.
     parser.add_argument(
             '--model_class', default='VAE', type=str, 
-            choices=['VAE', 'cVAE', 'gBC'])
+            choices=['VAE', 'cVAE', 'gBC', 'align'])
     parser.add_argument('--checkpoint_path', default=None, type=str)
     parser.add_argument('--action_scale', default=10, type=int)
     parser.add_argument('--step_rate', default=0.1, type=float)
@@ -66,8 +67,10 @@ if __name__ == '__main__':
         ModelClass = vae.VAE
     elif args.model_class == 'gBC':
         ModelClass = gbc.GaussianBC
-    else:
+    elif args.model_class == 'cVAE':
         ModelClass = cvae.ConditionalVAE
+    elif args.model_class == 'align':
+        ModelClass = aligned_decoder.AlignedDecoder
     
     if args.checkpoint_path is not None:
         decoder = ModelClass.load_from_checkpoint(args.checkpoint_path)
