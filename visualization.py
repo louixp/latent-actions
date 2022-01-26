@@ -21,7 +21,7 @@ def visualize_latent_actions_in_3d(
             None],
         action_scale: int,
         grid_size: int):
-    grid_step = action_scale // grid_size
+    grid_step = action_scale / grid_size
     x, y, z = np.meshgrid(np.arange(-action_scale, action_scale, grid_step),
                           np.arange(-action_scale, action_scale, grid_step),
                           0)
