@@ -19,7 +19,7 @@ class AlignedDecoder(LightningModule):
         
         super().__init__()
 
-        self.save_hyperparameters()
+        self.save_hyperparameters("align_dims", "activation", "latent_dim")
         self.lr = lr
         self.latent_dim = latent_dim
 
@@ -46,17 +46,28 @@ class AlignedDecoder(LightningModule):
             latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         """Inference only. See step() for training."""
         z = self.aligner(latent)
-        return self.decoder(z) 
+        return self.decoder(latent=z, context=context) 
 
     def step(self, batch, batch_idx):
         context, action = batch
         z = self.aligner(action[:, :self.latent_dim])
-        z = torch.cat([z, context], dim = 1)
-        action_recon = self.decoder(z)
+        action_recon = self.decoder(latent=z, context=context)
         
         loss = F.mse_loss(action_recon, action, reduction="mean")
-        logs = {"align_loss": loss}
+        logs = {
+                "align_loss": loss,
+                "manifold_distance": self.mean_pointwise_manifold_distance(
+                    context)}
         return loss, logs
+
+    def mean_pointwise_manifold_distance(
+            self, context: torch.Tensor) -> torch.Tensor:
+        z = torch.rand((context.shape[0], self.latent_dim))
+        z_aligned = self.aligner(z)
+        action_aligned = self.decoder(latent=z_aligned, context=context)
+        action_unaligned = self.decoder(latent=z, context=context)
+        dist = F.mse_loss(action_aligned, action_unaligned, reduction="mean")
+        return dist 
 
     def training_step(self, batch, batch_idx):
         loss, logs = self.step(batch, batch_idx)

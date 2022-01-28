@@ -62,7 +62,7 @@ if args.align:
     parser.add_argument("--checkpoint_path", type=str, required=True)
     parser = AlignedDecoder.add_model_specific_args(parser)
     args = parser.parse_args()
-    decoder = ModelClass.load_from_checkpoint(args.checkpoint_path).decoder
+    decoder = ModelClass.load_from_checkpoint(args.checkpoint_path)
     model = AlignedDecoder(decoder=decoder, **vars(args))
 
 if not args.no_wandb:
