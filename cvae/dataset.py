@@ -8,10 +8,11 @@ from torch.utils.data import Dataset
 class DemonstrationDataset(Dataset):
 
     def __init__(self, 
-            path: str,
+            path: str, *,
             include_goal: bool,
             dof: int,
-            keep_success: bool):
+            keep_success: bool, 
+            size_limit: int = None):
         
         with open(path, "rb") as fp:
             data = pickle.load(fp)
@@ -47,8 +48,13 @@ class DemonstrationDataset(Dataset):
             self.actions = [
                     torch.cat((
                         torch.squeeze(torch.from_numpy(step[4])), 
-                        torch.squeeze(torch.from_numpy(step[1]))[3:]))
+                        torch.squeeze(torch.from_numpy(step[1]))[3:])
+                        ).to(torch.float32)
                     for epi in episodes for step in epi]
+
+        if size_limit is not None:
+            self.contexts = self.contexts[:size_limit]
+            self.actions = self.actions[:size_limit]
         
     def __len__(self) -> int:
         return len(self.contexts)
@@ -66,4 +72,7 @@ class DemonstrationDataset(Dataset):
     def add_dataset_specific_args(parent_parser):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
         parser.add_argument("--include_goal", action="store_true")
+        parser.add_argument("--dof", type=int, default=3, choices=(3, 7))
+        parser.add_argument("--keep_success", action="store_true")
+        parser.add_argument("--size_limit", type=int)
         return parser

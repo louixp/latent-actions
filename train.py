@@ -41,10 +41,15 @@ elif args.model_class == "gBC":
 else:
     ModelClass = ConditionalVAE
 
-dataset = DemonstrationDataset.from_baselines_rl_zoo(
-        "../rl-baselines3-zoo/demonstration.pkl", args.include_goal)
+dataset = DemonstrationDataset(
+        "data/demonstration-7dof.pkl", 
+        include_goal=args.include_goal, 
+        dof=args.dof, 
+        keep_success=args.keep_success, 
+        size_limit=args.size_limit)
+
 train_set, test_set = torch.utils.data.random_split(
-        dataset, [int(len(dataset) * .8), int(len(dataset) * .2)])
+        dataset, [int(len(dataset) * .8), len(dataset) - int(len(dataset) * .8)])
 train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
 test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
 
