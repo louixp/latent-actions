@@ -32,8 +32,8 @@ class ConditionalVAE(vae.VAE):
                 activation=activation,
                 context_dim=context_dim,
                 action_dim=action_dim,
-                include_joint_angles=include_joint_angles)
-
+		**kwargs)
+	
         self.dropout = nn.Dropout(dropout)
         
         enc_dims = [action_dim + context_dim] + list(enc_dims)
