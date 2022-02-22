@@ -27,6 +27,7 @@ class VAE(LightningModule):
         self.save_hyperparameters()
         
         self.latent_dim = latent_dim
+        self.action_dim = action_dim
         self.lr = lr
         self.kl_coeff = kl_coeff
         self.kl_schedule = kl_schedule 
