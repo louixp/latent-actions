@@ -31,7 +31,8 @@ class ConditionalVAE(vae.VAE):
                 kl_schedule=kl_schedule,
                 activation=activation,
                 context_dim=context_dim,
-                action_dim=action_dim)
+                action_dim=action_dim,
+                include_joint_angles=include_joint_angles)
 
         self.dropout = nn.Dropout(dropout)
         

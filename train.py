@@ -44,6 +44,7 @@ else:
 dataset = DemonstrationDataset(
         "data/demonstration-7dof.pkl", 
         include_goal=args.include_goal, 
+        include_joint_angles=args.include_joint_angles,
         dof=args.dof, 
         keep_success=args.keep_success, 
         size_limit=args.size_limit)

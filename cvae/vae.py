@@ -21,6 +21,7 @@ class VAE(LightningModule):
             activation: str = "relu",
             context_dim: int = 19,
             action_dim: int = 4,
+            include_joint_angles: bool = False,
             **kwargs):
         super().__init__()
 
@@ -31,6 +32,7 @@ class VAE(LightningModule):
         self.lr = lr
         self.kl_coeff = kl_coeff
         self.kl_schedule = kl_schedule 
+        self.include_joint_angles = include_joint_angles
         
         if activation == "tanh":
             self.Activation = nn.Tanh

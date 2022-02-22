@@ -10,9 +10,11 @@ class DemonstrationDataset(Dataset):
     def __init__(self, 
             path: str, *,
             include_goal: bool,
+            include_joint_angles: bool,
             dof: int,
             keep_success: bool, 
             size_limit: int = None):
+        print(f"Initializing DemonstrationDataset with arguements: {locals()}")
         
         with open(path, "rb") as fp:
             data = pickle.load(fp)
@@ -30,15 +32,20 @@ class DemonstrationDataset(Dataset):
                 for epi in episodes for step in epi]
                     
         # Remove time wrapper feature.
-        observations = [o[:-1] for o in observations]
+        self.contexts = [o[:-1] for o in observations]
         
         if include_goal:
             goals = [
                     torch.squeeze(torch.from_numpy(step[0]["desired_goal"])) 
                     for epi in episodes for step in epi]
-            self.contexts = [torch.cat(c) for c in zip(observations, goals)]
-        else:
-            self.contexts = observations
+            self.contexts = [torch.cat(c) for c in zip(self.contexts, goals)]
+        
+        if include_joint_angles:
+            joint_angles = [
+                    torch.squeeze(torch.tensor(step[2])) 
+                    for epi in episodes for step in epi]
+            self.contexts = [
+                    torch.cat(c) for c in zip(self.contexts, joint_angles)]
 
         assert dof in {3, 7}, f"DoF {dof} not supported"
         if dof == 3:
@@ -72,6 +79,7 @@ class DemonstrationDataset(Dataset):
     def add_dataset_specific_args(parent_parser):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
         parser.add_argument("--include_goal", action="store_true")
+        parser.add_argument("--include_joint_angles", action="store_true")
         parser.add_argument("--dof", type=int, default=3, choices=(3, 7))
         parser.add_argument("--keep_success", action="store_true")
         parser.add_argument("--size_limit", type=int)
