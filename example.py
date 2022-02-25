@@ -39,6 +39,12 @@ def simulate(
         if decoder.hparams.get('include_goal'):
             goal = torch.from_numpy(obs['desired_goal'])
             context = torch.cat((context, goal))
+        if decoder.hparams.get('include_joint_angles'):
+            joint_angles = torch.tensor([
+                    env.sim.get_joint_angle(env.robot.body_name, i)
+                    for i in range(7)])
+            context = torch.cat((context, joint_angles))
+
         context = torch.unsqueeze(context, 0).float()
         for conn in conns:
             conn.send((latent_action, context))
