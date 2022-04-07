@@ -84,6 +84,22 @@ class ConditionalVAE(vae.VAE):
         action_zero = self.decoder(x_dec)
         return torch.linalg.norm(action_zero)
 
+    def _batch_jacobian(self, x):
+        """Computes the Jacobian at a batch of inputs x."""
+        # Adapted from https://discuss.pytorch.org/t/computing-batch-jacobian-efficiently/80771/5
+        def _func_sum(x):
+            return self.decoder(x).sum(dim=0)
+        return torch.autograd.functional.jacobian(
+                _func_sum, x, create_graph=True).permute(1,0,2)
+
+    def _decoder_divergence(self, context, z):
+        if self.latent_dim != 2:
+            print("WARNING: latent dim != 2 and decoder divergence may not be meaningful.")
+        zero = torch.zeros_like(z)
+        x_dec = torch.cat([zero, context], dim = 1)
+        jacobian = self._batch_jacobian(x_dec) 
+        return jacobian[:, 0, 0] + jacobian[:, 1, 1]
+
     @staticmethod
     def add_model_specific_args(parent_parser):
         parser = super(ConditionalVAE, ConditionalVAE).add_model_specific_args(
