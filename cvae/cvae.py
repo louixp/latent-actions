@@ -3,6 +3,7 @@ from typing import List, Tuple
 
 import torch
 from torch import nn
+import wandb
 
 from . import vae
 
@@ -78,6 +79,23 @@ class ConditionalVAE(vae.VAE):
         loss += self.fixed_point_coeff * fixed_point_loss
         return loss, logs
 
+    def validation_step(self, batch, batch_idx):
+        super().validation_step(batch, batch_idx)
+        context = batch[0]
+        distance = self._batch_distance_to_object(context)
+        divergence = self._decoder_divergence(context)
+        return distance, divergence
+
+    def validation_epoch_end(self, val_outs): 
+        distance, divergence = zip(*val_outs)
+        distance, divergence = torch.cat(distance), torch.cat(divergence)
+        data = [[x, y] for x, y in zip(distance, divergence)]
+        table = wandb.Table(
+                data=data, columns=["object distance", "divergence"])
+        wandb.log({
+            f"decoder divergence epoch {self.current_epoch}": 
+            wandb.plot.scatter(table, "object distance", "divergence")})
+
     def fixed_point_constraint(self, context, z):
         zero = torch.zeros_like(z)
         x_dec = torch.cat([zero, context], dim = 1)
@@ -92,13 +110,18 @@ class ConditionalVAE(vae.VAE):
         return torch.autograd.functional.jacobian(
                 _func_sum, x, create_graph=True).permute(1,0,2)
 
-    def _decoder_divergence(self, context, z):
+    def _decoder_divergence(self, context):
         if self.latent_dim != 2:
             print("WARNING: latent dim != 2 and decoder divergence may not be meaningful.")
-        zero = torch.zeros_like(z)
+        zero = torch.zeros(context.shape[0], self.latent_dim)
         x_dec = torch.cat([zero, context], dim = 1)
         jacobian = self._batch_jacobian(x_dec) 
         return jacobian[:, 0, 0] + jacobian[:, 1, 1]
+
+    def _batch_distance_to_object(self, context):
+        ee_pos = context[:, 0:3]
+        obj_pos = context[:, 7:10]
+        return torch.norm(ee_pos - obj_pos, dim=-1)
 
     @staticmethod
     def add_model_specific_args(parent_parser):
