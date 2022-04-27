@@ -22,6 +22,7 @@ class ConditionalVAE(vae.VAE):
             action_dim: int = 4,
             fixed_point_coeff: int = 0,
             dropout: float = 0,
+            div_coeff: float = 0, 
             **kwargs): 
         super().__init__(
                 latent_dim=latent_dim, 
@@ -36,6 +37,7 @@ class ConditionalVAE(vae.VAE):
 		**kwargs)
 	
         self.dropout = nn.Dropout(dropout)
+        self.div_coeff = div_coeff
         
         enc_dims = [action_dim + context_dim] + list(enc_dims)
         enc_layers = [
@@ -77,6 +79,7 @@ class ConditionalVAE(vae.VAE):
         fixed_point_loss = self.fixed_point_constraint(context, z)
         logs["fixed_point_loss"] = fixed_point_loss
         loss += self.fixed_point_coeff * fixed_point_loss
+        loss -= self.div_coeff * self._decoder_divergence(context).mean()
         return loss, logs
 
     def validation_step(self, batch, batch_idx):
@@ -129,4 +132,5 @@ class ConditionalVAE(vae.VAE):
                 parent_parser)
         parser.add_argument("--fixed_point_coeff", type=float, default=0)
         parser.add_argument("--dropout", type=float, default=0)
+        parser.add_argument("--div_coeff", type=float, default=0)
         return parser
