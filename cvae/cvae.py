@@ -24,6 +24,7 @@ class ConditionalVAE(vae.VAE):
             fixed_point_coeff: int = 0,
             dropout: float = 0,
             div_coeff: float = 0, 
+            div_clip: float = float("inf"),
             **kwargs): 
         super().__init__(
                 latent_dim=latent_dim, 
@@ -39,6 +40,7 @@ class ConditionalVAE(vae.VAE):
 	
         self.dropout = nn.Dropout(dropout)
         self.div_coeff = div_coeff
+        self.div_clip = div_clip
         
         enc_dims = [action_dim + context_dim] + list(enc_dims)
         enc_layers = [
@@ -80,7 +82,11 @@ class ConditionalVAE(vae.VAE):
         fixed_point_loss = self.fixed_point_constraint(context, z)
         logs["fixed_point_loss"] = fixed_point_loss
         loss += self.fixed_point_coeff * fixed_point_loss
-        loss -= self.div_coeff * self._decoder_divergence(context).mean()
+        
+        clipped_divergence = torch.minimum(
+                self._decoder_divergence(context), 
+                torch.tensor([self.div_clip]))
+        loss -= self.div_coeff * clipped_divergence.mean()
         return loss, logs
 
     def validation_step(self, batch, batch_idx):
@@ -135,4 +141,5 @@ class ConditionalVAE(vae.VAE):
         parser.add_argument("--fixed_point_coeff", type=float, default=0)
         parser.add_argument("--dropout", type=float, default=0)
         parser.add_argument("--div_coeff", type=float, default=0)
+        parser.add_argument("--div_clip", type=float, default=float("inf"))
         return parser
