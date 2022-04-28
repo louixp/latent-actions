@@ -97,10 +97,13 @@ class ConditionalVAE(vae.VAE):
         return distance, divergence
 
     def validation_epoch_end(self, val_outs): 
+        distance, divergence = zip(*val_outs)
+        distance, divergence = torch.cat(distance), torch.cat(divergence)
+        data = [[x, y] for x, y in zip(distance, divergence)]
+        self.log("max_scaled_mean_divergence", 
+                divergence.mean() / torch.max(divergence))
+
         if isinstance(self.logger, pytorch_lightning.loggers.WandbLogger):
-            distance, divergence = zip(*val_outs)
-            distance, divergence = torch.cat(distance), torch.cat(divergence)
-            data = [[x, y] for x, y in zip(distance, divergence)]
             table = wandb.Table(
                     data=data, columns=["object distance", "divergence"])
             wandb.log({
