@@ -101,30 +101,19 @@ class ConditionalVAE(vae.VAE):
                 f"decoder divergence epoch {self.current_epoch}":
                 wandb.plot.scatter(table, "object distance", "divergence")})
 
-
-        print("MODEL WEIGHTS")
-        # for param in self.parameters(): # works well
-        #     print(param.data)
-        # print weights of decoder layer for
-
-        # decoder weights
-        # print("decoder weights")
+        # log decoder first layer's weight
         decoderWeights = self.decoder[0].weight
-        # print(decoderWeights.shape) #10x21 (input is 21 and output is 10) latent is 2 context is 19
-
-        # measure magnitude of latent
-        latentpart = decoderWeights[:,:2] #10x2
-        print("latent part of decoder:", latentpart.shape, torch.norm(latentpart))
-        # print(latentpart.shape)
-        # print(latentpart)
-        # print(torch.norm(latentpart))
-
-        # measure magnitude of context
-        contextpart = decoderWeights[:,2:] #10x19
-        print("context part of decoder:", contextpart.shape, torch.norm(contextpart))
-        # print(contextpart.shape)
-        # print(contextpart)
-        # print(torch.norm(contextpart))
+        latentpart = decoderWeights[:,:2] #10x2 latent
+        contextpart = decoderWeights[:,2:] #10x19 context
+        # average norm: average of square each value. better comparison then L2 norm, since latent numel is smaller
+        avglatentnorm = torch.sum(latentpart*latentpart) / torch.numel(latentpart)
+        avgcontextnorm = torch.sum(contextpart*contextpart) / torch.numel(contextpart)
+        if self.no_wandb: # print result
+            print("first layer latent magnitude:", latentpart.shape, avglatentnorm)
+            print("first layer context magnitude:", contextpart.shape, avgcontextnorm)
+        if not self.no_wandb: # log result
+            wandb.log({"first_layer_latent_magnitude": avglatentnorm,
+                    "first_layer_context_magnitude": avgcontextnorm})
 
 
     def fixed_point_constraint(self, context, z):
