@@ -4,6 +4,7 @@ from typing import List, Tuple
 import torch
 from torch import nn
 import wandb
+import pytorch_lightning
 
 from . import vae
 
@@ -53,9 +54,6 @@ class ConditionalVAE(vae.VAE):
 
         self.fixed_point_coeff = fixed_point_coeff
 
-        #wandb variable must be passed in to set or unset
-        self.no_wandb = kwargs["no_wandb"]
-
     def forward(self, *,
             latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         """Inference only. See step() for training."""
@@ -94,7 +92,7 @@ class ConditionalVAE(vae.VAE):
         distance, divergence = torch.cat(distance), torch.cat(divergence)
         data = [[x, y] for x, y in zip(distance, divergence)]
 
-        if not self.no_wandb:
+        if isinstance(self.logger, pytorch_lightning.loggers.WandbLogger):
             table = wandb.Table(
                     data=data, columns=["object distance", "divergence"])
             wandb.log({
@@ -108,12 +106,12 @@ class ConditionalVAE(vae.VAE):
         # average norm: average of square each value. better comparison then L2 norm, since latent numel is smaller
         avglatentnorm = torch.sum(latentpart*latentpart) / torch.numel(latentpart)
         avgcontextnorm = torch.sum(contextpart*contextpart) / torch.numel(contextpart)
-        if self.no_wandb: # print result
-            print("first layer latent magnitude:", latentpart.shape, avglatentnorm)
-            print("first layer context magnitude:", contextpart.shape, avgcontextnorm)
-        if not self.no_wandb: # log result
+        if isinstance(self.logger, pytorch_lightning.loggers.WandbLogger): # log result
             wandb.log({"first_layer_latent_magnitude": avglatentnorm,
                     "first_layer_context_magnitude": avgcontextnorm})
+        else: # print result
+            print("first layer latent magnitude:", latentpart.shape, avglatentnorm)
+            print("first layer context magnitude:", contextpart.shape, avgcontextnorm)
 
 
     def fixed_point_constraint(self, context, z):
@@ -129,6 +127,11 @@ class ConditionalVAE(vae.VAE):
             return self.decoder(x).sum(dim=0)
         return torch.autograd.functional.jacobian(
                 _func_sum, x, create_graph=True).permute(1,0,2)
+
+    def _action_norm_gradient(self,x):
+        def _func(x):
+            return torch.norm(self.decoder(x))
+        return torch.autograd.functional.jacobian(_func,x)
 
     def _decoder_divergence(self, context):
         if self.latent_dim != 2:
