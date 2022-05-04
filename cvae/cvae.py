@@ -78,6 +78,29 @@ class ConditionalVAE(vae.VAE):
         fixed_point_loss = self.fixed_point_constraint(context, z)
         logs["fixed_point_loss"] = fixed_point_loss
         loss += self.fixed_point_coeff * fixed_point_loss
+
+
+        # regularize by introducing action norm gradient w.r.t context
+        contextOnlyInput = x_dec.clone(); contextOnlyInput[:,:2] = 0
+        contextContribution = self._action_norm_gradient(contextOnlyInput)[:,2:]
+        # averageContextContributionMagnitude = torch.norm(contextContribution)
+        averageContextContributionMagnitude = torch.sum(contextContribution*contextContribution) / torch.numel(contextContribution)
+
+        # regularize by introducing action norm gradient w.r.t z
+        zOnlyInput = x_dec.clone(); zOnlyInput[:,2:] = 0
+        zContribution = self._action_norm_gradient(zOnlyInput)[:,:2]
+        # averageZContributionMagnitude = torch.norm(zContribution)
+        averageZContributionMagnitude = torch.sum(zContribution*zContribution) / torch.numel(zContribution)
+
+        if not isinstance(self.logger, pytorch_lightning.loggers.WandbLogger):
+            print("context contribution",averageContextContributionMagnitude)
+            print("z contribution",averageZContributionMagnitude)
+        if isinstance(self.logger, pytorch_lightning.loggers.WandbLogger): # log result
+            logs["average_context_contribution_to_magnitude_of_output"] = averageContextContributionMagnitude
+            logs["average_z_contribution_to_magnitude_of_output"] = averageZContributionMagnitude
+
+        loss += (averageContextContributionMagnitude) * 1000 #weight I decided
+
         return loss, logs
 
     def validation_step(self, batch, batch_idx):
