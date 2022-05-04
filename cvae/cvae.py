@@ -10,11 +10,11 @@ from . import vae
 
 class ConditionalVAE(vae.VAE):
 
-    def __init__(self, 
+    def __init__(self,
             latent_dim: int,
             enc_dims: Tuple[int],
             dec_dims: Tuple[int],
-            lr: float, 
+            lr: float,
             kl_coeff: float,
             kl_schedule: str = "constant",
             activation: str = "relu",
@@ -22,10 +22,10 @@ class ConditionalVAE(vae.VAE):
             action_dim: int = 4,
             fixed_point_coeff: int = 0,
             dropout: float = 0,
-            **kwargs): 
+            **kwargs):
         super().__init__(
-                latent_dim=latent_dim, 
-                enc_dims=enc_dims, 
+                latent_dim=latent_dim,
+                enc_dims=enc_dims,
                 dec_dims=dec_dims,
                 lr=lr,
                 kl_coeff=kl_coeff,
@@ -34,9 +34,9 @@ class ConditionalVAE(vae.VAE):
                 context_dim=context_dim,
                 action_dim=action_dim,
 		**kwargs)
-	
+
         self.dropout = nn.Dropout(dropout)
-        
+
         enc_dims = [action_dim + context_dim] + list(enc_dims)
         enc_layers = [
                 layer for d_in, d_out in zip(enc_dims[:-1], enc_dims[1:])
@@ -53,26 +53,29 @@ class ConditionalVAE(vae.VAE):
 
         self.fixed_point_coeff = fixed_point_coeff
 
-    def forward(self, *, 
+        #wandb variable must be passed in to set or unset
+        self.no_wandb = kwargs["no_wandb"]
+
+    def forward(self, *,
             latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         """Inference only. See step() for training."""
         z = torch.cat([latent, context], dim = 1)
         return self.decoder(z)
-    
+
     def step(self, batch, batch_idx, kl_coeff):
         context, action = batch
         context = self.dropout(context)
-        
+
         x = torch.cat([action, context], dim = 1)
         x = self.encoder(x)
-        
+
         mu = self.fc_mu(x)
         log_var = self.fc_var(x)
         p, q, z = self.sample(mu, log_var)
-        
+
         x_dec = torch.cat([z, context], dim = 1)
         action_recon = self.decoder(x_dec)
-        
+
         loss, logs = self.compute_vae_loss(action, action_recon, p, q, kl_coeff)
         fixed_point_loss = self.fixed_point_constraint(context, z)
         logs["fixed_point_loss"] = fixed_point_loss
@@ -86,15 +89,43 @@ class ConditionalVAE(vae.VAE):
         divergence = self._decoder_divergence(context)
         return distance, divergence
 
-    def validation_epoch_end(self, val_outs): 
+    def validation_epoch_end(self, val_outs):
         distance, divergence = zip(*val_outs)
         distance, divergence = torch.cat(distance), torch.cat(divergence)
         data = [[x, y] for x, y in zip(distance, divergence)]
-        table = wandb.Table(
-                data=data, columns=["object distance", "divergence"])
-        wandb.log({
-            f"decoder divergence epoch {self.current_epoch}": 
-            wandb.plot.scatter(table, "object distance", "divergence")})
+
+        if not self.no_wandb:
+            table = wandb.Table(
+                    data=data, columns=["object distance", "divergence"])
+            wandb.log({
+                f"decoder divergence epoch {self.current_epoch}":
+                wandb.plot.scatter(table, "object distance", "divergence")})
+
+
+        print("MODEL WEIGHTS")
+        # for param in self.parameters(): # works well
+        #     print(param.data)
+        # print weights of decoder layer for
+
+        # decoder weights
+        # print("decoder weights")
+        decoderWeights = self.decoder[0].weight
+        # print(decoderWeights.shape) #10x21 (input is 21 and output is 10) latent is 2 context is 19
+
+        # measure magnitude of latent
+        latentpart = decoderWeights[:,:2] #10x2
+        print("latent part of decoder:", latentpart.shape, torch.norm(latentpart))
+        # print(latentpart.shape)
+        # print(latentpart)
+        # print(torch.norm(latentpart))
+
+        # measure magnitude of context
+        contextpart = decoderWeights[:,2:] #10x19
+        print("context part of decoder:", contextpart.shape, torch.norm(contextpart))
+        # print(contextpart.shape)
+        # print(contextpart)
+        # print(torch.norm(contextpart))
+
 
     def fixed_point_constraint(self, context, z):
         zero = torch.zeros_like(z)
@@ -115,7 +146,7 @@ class ConditionalVAE(vae.VAE):
             print("WARNING: latent dim != 2 and decoder divergence may not be meaningful.")
         zero = torch.zeros(context.shape[0], self.latent_dim)
         x_dec = torch.cat([zero, context], dim = 1)
-        jacobian = self._batch_jacobian(x_dec) 
+        jacobian = self._batch_jacobian(x_dec)
         return jacobian[:, 0, 0] + jacobian[:, 1, 1]
 
     def _batch_distance_to_object(self, context):
