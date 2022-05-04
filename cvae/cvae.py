@@ -98,8 +98,7 @@ class ConditionalVAE(vae.VAE):
         if isinstance(self.logger, pytorch_lightning.loggers.WandbLogger): # log result
             logs["average_context_contribution_to_magnitude_of_output"] = averageContextContributionMagnitude
             logs["average_z_contribution_to_magnitude_of_output"] = averageZContributionMagnitude
-
-        loss += (averageContextContributionMagnitude) * 1000 #weight I decided
+        loss += (averageContextContributionMagnitude-averageZContributionMagnitude) * 1000 #weight I decided
 
         return loss, logs
 
