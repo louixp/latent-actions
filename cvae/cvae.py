@@ -7,6 +7,7 @@ import pytorch_lightning
 import wandb
 
 from . import vae
+from . import distance_gated_decoder
 
 
 class ConditionalVAE(vae.VAE):
@@ -25,6 +26,7 @@ class ConditionalVAE(vae.VAE):
             dropout: float = 0,
             div_coeff: float = 0, 
             div_clip: float = float("inf"),
+            distance_gated_decode: bool = False,
             **kwargs): 
         super().__init__(
                 latent_dim=latent_dim, 
@@ -37,10 +39,12 @@ class ConditionalVAE(vae.VAE):
                 context_dim=context_dim,
                 action_dim=action_dim,
 		**kwargs)
-	
+	    
         self.dropout = nn.Dropout(dropout)
+        self.fixed_point_coeff = fixed_point_coeff
         self.div_coeff = div_coeff
         self.div_clip = div_clip
+        self.distance_gated_decode = distance_gated_decode
         
         enc_dims = [action_dim + context_dim] + list(enc_dims)
         enc_layers = [
@@ -48,21 +52,27 @@ class ConditionalVAE(vae.VAE):
                 for layer in [nn.Linear(d_in, d_out), self.Activation()]]
         enc_layers.pop()
         self.encoder = nn.Sequential(*enc_layers)
-
-        dec_dims = [latent_dim + context_dim] + list(dec_dims) + [action_dim]
-        dec_layers = [
-                layer for d_in, d_out in zip(dec_dims[:-1], dec_dims[1:])
-                for layer in [nn.Linear(d_in, d_out), self.Activation()]]
-        dec_layers.pop()
-        self.decoder = nn.Sequential(*dec_layers)
-
-        self.fixed_point_coeff = fixed_point_coeff
+        
+        if distance_gated_decode:
+            self.decoder = distance_gated_decoder.DistanceGatedDecoder(
+                    latent_dim=latent_dim,
+                    context_dim=context_dim,
+                    action_dim=action_dim,
+                    dec_dims=dec_dims,
+                    activation=activation,
+                    **kwargs)
+        else:
+            self.decoder = distance_gated_decoder.MLPDecoder(
+                    latent_dim=latent_dim,
+                    context_dim=context_dim,
+                    action_dim=action_dim,
+                    dec_dims=dec_dims,
+                    activation=activation)
 
     def forward(self, *, 
             latent: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         """Inference only. See step() for training."""
-        z = torch.cat([latent, context], dim = 1)
-        return self.decoder(z)
+        return self.decoder(latent=latent, context=context)
     
     def step(self, batch, batch_idx, kl_coeff):
         context, action = batch
@@ -75,8 +85,7 @@ class ConditionalVAE(vae.VAE):
         log_var = self.fc_var(x)
         p, q, z = self.sample(mu, log_var)
         
-        x_dec = torch.cat([z, context], dim = 1)
-        action_recon = self.decoder(x_dec)
+        action_recon = self.decoder(latent=z, context=context)
         
         loss, logs = self.compute_vae_loss(action, action_recon, p, q, kl_coeff)
         fixed_point_loss = self.fixed_point_constraint(context, z)
@@ -112,24 +121,22 @@ class ConditionalVAE(vae.VAE):
 
     def fixed_point_constraint(self, context, z):
         zero = torch.zeros_like(z)
-        x_dec = torch.cat([zero, context], dim = 1)
-        action_zero = self.decoder(x_dec)
+        action_zero = self.decoder(latent=zero, context=context)
         return torch.linalg.norm(action_zero)
 
-    def _batch_jacobian(self, x):
+    def _batch_jacobian(self, context):
         """Computes the Jacobian at a batch of inputs x."""
         # Adapted from https://discuss.pytorch.org/t/computing-batch-jacobian-efficiently/80771/5
         def _func_sum(x):
-            return self.decoder(x).sum(dim=0)
+            zero = torch.zeros(context.shape[0], self.latent_dim)
+            return self.decoder(latent=zero, context=x).sum(dim=0)
         return torch.autograd.functional.jacobian(
-                _func_sum, x, create_graph=True).permute(1,0,2)
+                _func_sum, context, create_graph=True).permute(1,0,2)
 
     def _decoder_divergence(self, context):
         if self.latent_dim != 2:
             print("WARNING: latent dim != 2 and decoder divergence may not be meaningful.")
-        zero = torch.zeros(context.shape[0], self.latent_dim)
-        x_dec = torch.cat([zero, context], dim = 1)
-        jacobian = self._batch_jacobian(x_dec) 
+        jacobian = self._batch_jacobian(context) 
         return jacobian[:, 0, 0] + jacobian[:, 1, 1]
 
     def _batch_distance_to_object(self, context):
@@ -145,4 +152,8 @@ class ConditionalVAE(vae.VAE):
         parser.add_argument("--dropout", type=float, default=0)
         parser.add_argument("--div_coeff", type=float, default=0)
         parser.add_argument("--div_clip", type=float, default=float("inf"))
+        parser.add_argument("--distance_gated_decode", action="store_true")
+        parser.add_argument("--gated_feature_dim", type=int)
+        parser.add_argument("--context_featurizer_dims", nargs='+', type=int)
+        parser.add_argument("--latent_featurizer_dims", nargs='+', type=int)
         return parser
