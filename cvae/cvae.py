@@ -82,15 +82,17 @@ class ConditionalVAE(vae.VAE):
 
         # regularize by introducing action norm gradient w.r.t context
         contextOnlyInput = x_dec.clone(); contextOnlyInput[:,:2] = 0
-        contextContribution = self._action_norm_gradient(contextOnlyInput)[:,2:]
+        contextContribution = self._action_norm_gradient(contextOnlyInput)[:,:,2:]
         # averageContextContributionMagnitude = torch.norm(contextContribution)
-        averageContextContributionMagnitude = torch.sum(contextContribution*contextContribution) / torch.numel(contextContribution)
+        averageContextContributionMagnitude = torch.sum(contextContribution*contextContribution) / (torch.numel(contextContribution)/contextContribution.shape[0])
+        #^normally it's shape is 32,32,19, but only 32,19 values are propagated. shows how those 19 values influence 32 batch sized outputs. so for individual influence, it isi average over 19*32 values
 
         # regularize by introducing action norm gradient w.r.t z
         zOnlyInput = x_dec.clone(); zOnlyInput[:,2:] = 0
-        zContribution = self._action_norm_gradient(zOnlyInput)[:,:2]
+        zContribution = self._action_norm_gradient(zOnlyInput)[:,:,:2]
         # averageZContributionMagnitude = torch.norm(zContribution)
-        averageZContributionMagnitude = torch.sum(zContribution*zContribution) / torch.numel(zContribution)
+        averageZContributionMagnitude = torch.sum(zContribution*zContribution) / (torch.numel(zContribution)/contextContribution.shape[0])
+        #^normally it's shape is 32,32,2. but only 32,2 values are propagated.shows how those 19 values influence 32 batch sized outputs. so for individual influence, it isi average over 2*32 values
 
         if not isinstance(self.logger, pytorch_lightning.loggers.WandbLogger):
             print("context contribution",averageContextContributionMagnitude)
@@ -152,7 +154,7 @@ class ConditionalVAE(vae.VAE):
 
     def _action_norm_gradient(self,x):
         def _func(x):
-            return torch.norm(self.decoder(x))
+            return torch.norm(self.decoder(x),dim=1)
         return torch.autograd.functional.jacobian(_func,x)
 
     def _decoder_divergence(self, context):
