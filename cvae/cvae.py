@@ -78,6 +78,17 @@ class ConditionalVAE(vae.VAE):
         fixed_point_loss = self.fixed_point_constraint(context, z)
         logs["fixed_point_loss"] = fixed_point_loss
         loss += self.fixed_point_coeff * fixed_point_loss
+
+        # add weight regularization term
+        decoderWeights = self.decoder[0].weight
+        latentpart = decoderWeights[:,:2] #10x2 latent
+        contextpart = decoderWeights[:,2:] #10x19 context
+        # average norm: average of square each value. better comparison then L2 norm, since latent numel is smaller
+        avglatentnorm = torch.sum(latentpart*latentpart) / torch.numel(latentpart)
+        avgcontextnorm = torch.sum(contextpart*contextpart) / torch.numel(contextpart)
+        loss += avgcontextnorm
+        print(avglatentnorm)
+
         return loss, logs
 
     def validation_step(self, batch, batch_idx):
