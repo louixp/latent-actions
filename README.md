@@ -1,3 +1,7 @@
+Everything in this repo is already mergd to `decoderWeightRegularizer` at commit ec3b3df159a2751931aebf31298d5811056478f7.
+it is nice to take a look here. but this is essentially a dead branch now.
+
+
 To start up a simulation, run
 
 ```
