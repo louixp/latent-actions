@@ -81,7 +81,7 @@ class ConditionalVAE(vae.VAE):
 
         # weight weightRegularization
         loss += self.decoderWeightRegularization()
-        loss += self.gradientMagnitdueRegularization(x_dec,logs)
+        loss += self.gradientMagnitdueRegularization(x_dec,logs) # is only logging, not regularizing
 
         return loss, logs
 
@@ -118,8 +118,8 @@ class ConditionalVAE(vae.VAE):
             logs["average_context_contribution_to_magnitude_of_output"] = averageContextContributionMagnitude
             logs["average_z_contribution_to_magnitude_of_output"] = averageZContributionMagnitude
 
-        return (averageContextContributionMagnitude-averageZContributionMagnitude) * 1000 #weight I decided
-        # return 0
+        # return (averageContextContributionMagnitude-averageZContributionMagnitude) * 1000 #weight I decided
+        return 0
 
 
     def validation_step(self, batch, batch_idx):
