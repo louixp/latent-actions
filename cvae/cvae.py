@@ -86,8 +86,7 @@ class ConditionalVAE(vae.VAE):
         # average norm: average of square each value. better comparison then L2 norm, since latent numel is smaller
         avglatentnorm = torch.sum(latentpart*latentpart) / torch.numel(latentpart)
         avgcontextnorm = torch.sum(contextpart*contextpart) / torch.numel(contextpart)
-        loss += avgcontextnorm
-        print(avglatentnorm)
+        loss += avgcontextnorm * 10
 
         return loss, logs
 
