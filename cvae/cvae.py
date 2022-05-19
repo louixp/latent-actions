@@ -79,6 +79,13 @@ class ConditionalVAE(vae.VAE):
         logs["fixed_point_loss"] = fixed_point_loss
         loss += self.fixed_point_coeff * fixed_point_loss
 
+        # weight weightRegularization
+        loss += self.decoderWeightRegularization()
+        loss += self.gradientMagnitdueRegularization(x_dec,logs)
+
+        return loss, logs
+
+    def decoderWeightRegularization(self):
         # add weight regularization term
         decoderWeights = self.decoder[0].weight
         latentpart = decoderWeights[:,:2] #10x2 latent
@@ -86,9 +93,34 @@ class ConditionalVAE(vae.VAE):
         # average norm: average of square each value. better comparison then L2 norm, since latent numel is smaller
         avglatentnorm = torch.sum(latentpart*latentpart) / torch.numel(latentpart)
         avgcontextnorm = torch.sum(contextpart*contextpart) / torch.numel(contextpart)
-        loss += avgcontextnorm * 10
+        return avgcontextnorm * 10
 
-        return loss, logs
+    def gradientMagnitdueRegularization(self,x_dec,logs):
+
+        # regularize by introducing action norm gradient w.r.t context
+        contextOnlyInput = x_dec.clone(); contextOnlyInput[:,:2] = 0
+        contextContribution = self._action_norm_gradient(contextOnlyInput)[:,:,2:]
+        # averageContextContributionMagnitude = torch.norm(contextContribution)
+        averageContextContributionMagnitude = torch.sum(contextContribution*contextContribution) / (torch.numel(contextContribution)/contextContribution.shape[0])
+        #^normally it's shape is 32,32,19, but only 32,19 values are propagated. shows how those 19 values influence 32 batch sized outputs. so for individual influence, it isi average over 19*32 values
+
+        # regularize by introducing action norm gradient w.r.t z
+        zOnlyInput = x_dec.clone(); zOnlyInput[:,2:] = 0
+        zContribution = self._action_norm_gradient(zOnlyInput)[:,:,:2]
+        # averageZContributionMagnitude = torch.norm(zContribution)
+        averageZContributionMagnitude = torch.sum(zContribution*zContribution) / (torch.numel(zContribution)/contextContribution.shape[0])
+        #^normally it's shape is 32,32,2. but only 32,2 values are propagated.shows how those 19 values influence 32 batch sized outputs. so for individual influence, it isi average over 2*32 values
+
+        if not isinstance(self.logger, pytorch_lightning.loggers.WandbLogger):
+            print("context contribution",averageContextContributionMagnitude)
+            print("z contribution",averageZContributionMagnitude)
+        if isinstance(self.logger, pytorch_lightning.loggers.WandbLogger): # log result
+            logs["average_context_contribution_to_magnitude_of_output"] = averageContextContributionMagnitude
+            logs["average_z_contribution_to_magnitude_of_output"] = averageZContributionMagnitude
+
+        return (averageContextContributionMagnitude-averageZContributionMagnitude) * 1000 #weight I decided
+        # return 0
+
 
     def validation_step(self, batch, batch_idx):
         super().validation_step(batch, batch_idx)
@@ -140,7 +172,7 @@ class ConditionalVAE(vae.VAE):
 
     def _action_norm_gradient(self,x):
         def _func(x):
-            return torch.norm(self.decoder(x))
+            return torch.norm(self.decoder(x),dim=1)
         return torch.autograd.functional.jacobian(_func,x)
 
     def _decoder_divergence(self, context):
