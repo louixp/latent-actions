@@ -91,8 +91,10 @@ class ConditionalVAE(vae.VAE):
         latentpart = decoderWeights[:,:2] #10x2 latent
         contextpart = decoderWeights[:,2:] #10x19 context
         # average norm: average of square each value. better comparison then L2 norm, since latent numel is smaller
-        avglatentnorm = torch.sum(latentpart*latentpart) / torch.numel(latentpart)
-        avgcontextnorm = torch.sum(contextpart*contextpart) / torch.numel(contextpart)
+        # avglatentnorm = torch.sum(latentpart*latentpart) / torch.numel(latentpart)
+        # avgcontextnorm = torch.sum(contextpart*contextpart) / torch.numel(contextpart)
+        avglatentnorm = torch.max(latentpart*latentpart)
+        avgcontextnorm = torch.max(contextpart*contextpart)
         return avgcontextnorm * 10
 
     def gradientMagnitdueRegularization(self,x_dec,logs):
@@ -148,9 +150,13 @@ class ConditionalVAE(vae.VAE):
         # average norm: average of square each value. better comparison then L2 norm, since latent numel is smaller
         avglatentnorm = torch.sum(latentpart*latentpart) / torch.numel(latentpart)
         avgcontextnorm = torch.sum(contextpart*contextpart) / torch.numel(contextpart)
+        maxlatentnorm = torch.max(latentpart*latentpart)
+        maxcontextnorm = torch.max(contextpart*contextpart)
         if isinstance(self.logger, pytorch_lightning.loggers.WandbLogger): # log result
             wandb.log({"first_layer_latent_magnitude": avglatentnorm,
-                    "first_layer_context_magnitude": avgcontextnorm})
+                    "first_layer_context_magnitude": avgcontextnorm,
+                    "first_layer_max_latent_magnitude": maxlatentnorm,
+                    "first_layer_max_context_magnitude": maxcontextnorm,})
         else: # print result
             print("first layer latent magnitude:", latentpart.shape, avglatentnorm)
             print("first layer context magnitude:", contextpart.shape, avgcontextnorm)
