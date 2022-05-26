@@ -1,3 +1,7 @@
+this branch split from decoderWeightRegularizer.
+it's goal is to add garbage value to context in random sequence to help the decoder use both context AND z vector to come up with final decision
+
+
 To start up a simulation, run
 
 ```
