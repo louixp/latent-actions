@@ -80,8 +80,8 @@ class ConditionalVAE(vae.VAE):
         loss += self.fixed_point_coeff * fixed_point_loss
 
         # weight weightRegularization
-        loss += self.decoderWeightRegularization()
-        loss += self.gradientMagnitdueRegularization(x_dec,logs) # is only logging, not regularizing
+        # loss += self.decoderWeightRegularization()
+        self.gradientMagnitdueRegularization(x_dec,logs) # is only logging, not regularizing
 
         return loss, logs
 

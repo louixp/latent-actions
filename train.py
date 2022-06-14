@@ -47,7 +47,8 @@ dataset = DemonstrationDataset(
         include_joint_angles=args.include_joint_angles,
         dof=args.dof,
         keep_success=args.keep_success,
-        size_limit=args.size_limit)
+        size_limit=args.size_limit,
+        add_adversarial_pos=args.add_adversarial_pos)
 
 train_set, test_set = torch.utils.data.random_split(
         dataset, [int(len(dataset) * .8), len(dataset) - int(len(dataset) * .8)])
