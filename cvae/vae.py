@@ -133,14 +133,14 @@ class VAE(LightningModule):
 
         parser.add_argument(
                 "--kl_schedule", type=str, default="cyclical", 
-                choices=["monotonic", "cyclical"], 
+                choices=["monotonic", "cyclical", "constant"], 
                 help="KL schedule.") 
         parser.add_argument(
                 "--kl_coeff", type=float, default=1, 
                 help="KL coeff for constant schedule.")
 
         parser.add_argument("--latent_dim", type=int, default=2)
-        parser.add_argument("--enc_dims", nargs='+', type=int, default=(3, 2))
-        parser.add_argument("--dec_dims", nargs='+', type=int, default=(3, ))
+        parser.add_argument("--enc_dims", nargs='+', type=int, default=[])
+        parser.add_argument("--dec_dims", nargs='+', type=int, default=[])
         return parser
 
