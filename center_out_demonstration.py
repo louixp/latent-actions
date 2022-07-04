@@ -1,10 +1,11 @@
 import pickle
 
 import numpy as np
+from tqdm import tqdm
 
 from envs.panda_center_out import PandaCenterOutEnv
 
-N_EPISODES = 100000
+N_STEPS = 100000
 
 env = PandaCenterOutEnv()
 
@@ -21,31 +22,39 @@ def ee_displacement_to_arm_joint_ctrl(env_ee, action_ee):
     return arm_joint_ctrl * 20
 
 episodes = []
+steps = 0
 
-for _ in range(N_EPISODES):
-    obs = env.reset()
-    neutral_position = obs['achieved_goal']
-    is_success = False
+with tqdm(total=N_STEPS) as pbar:
+    while steps < N_STEPS:
+        obs = env.reset()
+        neutral_position = obs['achieved_goal']
+        is_success = False
 
-    episode = []
+        episode = []
 
-    while not is_success:
-        action_ee = obs['desired_goal'] - obs['achieved_goal']
-        action_ee = np.clip(action_ee, env.robot.action_space.low, env.robot.action_space.high)
-        action_joints = ee_displacement_to_arm_joint_ctrl(env, action_ee)
+        while not is_success:
+            action_ee = obs['desired_goal'] - obs['achieved_goal']
+            action_ee = np.clip(
+                    action_ee, env.robot.action_space.low, 
+                    env.robot.action_space.high)
+            action_joints = ee_displacement_to_arm_joint_ctrl(env, action_ee)
+            
+            episode.append({
+                'action_ee': action_ee,
+                'action_joints': action_joints,
+                'previous_observation': obs,
+                'previous_joint_angles': np.array([
+                    env.robot.get_joint_angle(joint=i) for i in range(7)]),
+                # Infinity norm gives us boxes for data segmentation
+                'radius': np.linalg.norm(
+                    obs['achieved_goal'] - neutral_position, ord=np.inf)}) 
 
-        episode.append({
-            'action_ee': action_ee,
-            'action_joints': action_joints,
-            'previous_observation': obs,
-            # Infinity norm gives us boxes for data segmentation
-            'radius': np.linalg.norm(
-                obs['achieved_goal'] - neutral_position, ord=np.inf)}) 
+            obs, reward, done, info = env.step(action_ee)
+            is_success = info['is_success']
+            steps += 1
+            pbar.update(1)
 
-        obs, reward, done, info = env.step(action_ee)
-        is_success = info['is_success']
-
-    episodes.append(episode)
+        episodes.append(episode)
 
 with open('demonstration_center_out.pkl', 'wb') as fp:
     pickle.dump(episodes, fp)
