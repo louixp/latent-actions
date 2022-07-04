@@ -31,8 +31,12 @@ class CenterOutDemonstrationDataset(Dataset):
                 step['action_ee']
                 for episode in episodes for step in episode 
                 if step['radius'] < radius_cutoff], dtype=torch.float)
+        self.joint_angles = torch.tensor([
+                step['previous_joint_angles']
+                for episode in episodes for step in episode 
+                if step['radius'] < radius_cutoff], dtype=torch.float)
 
-        assert(len(self.actions_joints) == len(self.actions_ee))
+        assert(len(self.actions_joints) == len(self.actions_ee) == len(self.joint_angles))
 
         if size_limit is not None:
             self.actions_joints = self.actions_joints[:size_limit]
@@ -42,10 +46,7 @@ class CenterOutDemonstrationDataset(Dataset):
         return len(self.actions_joints)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        # NOTE: The VAE API assumes the first element of the returned tuple
-        # to be a context. Since there is no context in center out, we return
-        # ee action instead.
-        return self.actions_ee[idx], self.actions_joints[idx] 
+        return self.joint_angles[idx], self.actions_joints[idx] 
 
 
 parser = ArgumentParser()
