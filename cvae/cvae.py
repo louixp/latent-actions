@@ -23,6 +23,7 @@ class ConditionalVAE(vae.VAE):
             action_dim: int = 4,
             fixed_point_coeff: int = 0,
             dropout: float = 0,
+            compute_divergence: bool = False,
             div_coeff: float = 0, 
             div_clip: float = float("inf"),
             **kwargs): 
@@ -41,6 +42,7 @@ class ConditionalVAE(vae.VAE):
         self.dropout = nn.Dropout(dropout)
         self.div_coeff = div_coeff
         self.div_clip = div_clip
+        self.compute_divergence = compute_divergence 
         
         enc_dims = [action_dim + context_dim] + list(enc_dims)
         enc_layers = [
@@ -82,33 +84,36 @@ class ConditionalVAE(vae.VAE):
         fixed_point_loss = self.fixed_point_constraint(context, z)
         logs["fixed_point_loss"] = fixed_point_loss
         loss += self.fixed_point_coeff * fixed_point_loss
-        
-        clipped_divergence = torch.minimum(
-                self._decoder_divergence(context), 
-                torch.tensor([self.div_clip]))
-        loss -= self.div_coeff * clipped_divergence.mean()
+       
+        if self.compute_divergence:
+            clipped_divergence = torch.minimum(
+                    self._decoder_divergence(context), 
+                    torch.tensor([self.div_clip]))
+            loss -= self.div_coeff * clipped_divergence.mean()
         return loss, logs
 
     def validation_step(self, batch, batch_idx):
         super().validation_step(batch, batch_idx)
-        context = batch[0]
-        distance = self._batch_distance_to_object(context)
-        divergence = self._decoder_divergence(context)
-        return distance, divergence
+        if self.compute_divergence:
+            context = batch[0]
+            distance = self._batch_distance_to_object(context)
+            divergence = self._decoder_divergence(context)
+            return distance, divergence
 
     def validation_epoch_end(self, val_outs): 
-        distance, divergence = zip(*val_outs)
-        distance, divergence = torch.cat(distance), torch.cat(divergence)
-        data = [[x, y] for x, y in zip(distance, divergence)]
-        self.log("max_scaled_mean_divergence", 
-                divergence.mean() / torch.max(divergence))
+        if self.compute_divergence:
+            distance, divergence = zip(*val_outs)
+            distance, divergence = torch.cat(distance), torch.cat(divergence)
+            data = [[x, y] for x, y in zip(distance, divergence)]
+            self.log("max_scaled_mean_divergence", 
+                    divergence.mean() / torch.max(divergence))
 
-        if isinstance(self.logger, pytorch_lightning.loggers.WandbLogger):
-            table = wandb.Table(
-                    data=data, columns=["object distance", "divergence"])
-            wandb.log({
-                f"decoder divergence epoch {self.current_epoch}": 
-                wandb.plot.scatter(table, "object distance", "divergence")})
+            if isinstance(self.logger, pytorch_lightning.loggers.WandbLogger):
+                table = wandb.Table(
+                        data=data, columns=["object distance", "divergence"])
+                wandb.log({
+                    f"decoder divergence epoch {self.current_epoch}": 
+                    wandb.plot.scatter(table, "object distance", "divergence")})
 
     def fixed_point_constraint(self, context, z):
         zero = torch.zeros_like(z)
@@ -145,4 +150,5 @@ class ConditionalVAE(vae.VAE):
         parser.add_argument("--dropout", type=float, default=0)
         parser.add_argument("--div_coeff", type=float, default=0)
         parser.add_argument("--div_clip", type=float, default=float("inf"))
+        parser.add_argument("--compute_divergence", action="store_true", default=False) 
         return parser

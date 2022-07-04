@@ -5,7 +5,7 @@ from typing import Iterable, Tuple
 import torch
 from torch.utils.data import Dataset
 
-class DemonstrationDataset(Dataset):
+class PickAndPlaceDemonstrationDataset(Dataset):
 
     def __init__(self, 
             path: str, *,

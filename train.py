@@ -9,15 +9,16 @@ from pytorch_lightning.utilities.model_summary import ModelSummary
 from cvae.aligned_decoder import AlignedDecoder
 from cvae.cae import ConditionalAE
 from cvae.cvae import ConditionalVAE
-from cvae.dataset import DemonstrationDataset
 from cvae.gbc import GaussianBC 
 from cvae.vae import VAE
+from data.center_out import CenterOutDemonstrationDataset
+from data.pick_and_place import PickAndPlaceDemonstrationDataset
 
 
 parser = ArgumentParser()
-group = parser.add_mutually_exclusive_group(required=True)
-group.add_argument("--decode", action="store_true")
-group.add_argument("--align", action="store_true")
+deocde_align_group = parser.add_mutually_exclusive_group(required=True)
+deocde_align_group.add_argument("--decode", action="store_true")
+deocde_align_group.add_argument("--align", action="store_true")
 
 parser.add_argument(
         "--model_class", default="cVAE", type=str, 
@@ -27,10 +28,29 @@ parser.add_argument("--batch_size", type=int, default=32)
 #   hyperparameter space.
 parser.add_argument("--max_epochs", type=int, default=400)
 parser.add_argument("--no_wandb", action="store_true")
-parser = DemonstrationDataset.add_dataset_specific_args(parser)
+parser.add_argument(
+        "--dataset", required=True, choices=["pick_and_place", "center_out"])
 
 args, _ = parser.parse_known_args()
 assert(args.decode != args.align)
+
+if args.dataset == "center_out":
+    parser = CenterOutDemonstrationDataset.add_dataset_specific_args(parser)
+    args, _ = parser.parse_known_args()
+    dataset = CenterOutDemonstrationDataset(
+        "data/demonstration_center_out.pkl",
+        radius_cutoff=args.radius_cutoff,
+        size_limit=args.size_limit)
+elif args.dataset == "pick_and_place":
+    parser = PickAndPlaceDemonstrationDataset.add_dataset_specific_args(parser)
+    args, _ = parser.parse_known_args()
+    dataset = PickAndPlaceDemonstrationDataset(
+            "data/demonstration-7dof.pkl", 
+            include_goal=args.include_goal, 
+            include_joint_angles=args.include_joint_angles,
+            dof=args.dof, 
+            keep_success=args.keep_success, 
+            size_limit=args.size_limit)
 
 if args.model_class == "VAE":
     ModelClass = VAE
@@ -40,14 +60,6 @@ elif args.model_class == "gBC":
     ModelClass = GaussianBC
 else:
     ModelClass = ConditionalVAE
-
-dataset = DemonstrationDataset(
-        "data/demonstration-7dof.pkl", 
-        include_goal=args.include_goal, 
-        include_joint_angles=args.include_joint_angles,
-        dof=args.dof, 
-        keep_success=args.keep_success, 
-        size_limit=args.size_limit)
 
 train_set, test_set = torch.utils.data.random_split(
         dataset, [int(len(dataset) * .8), len(dataset) - int(len(dataset) * .8)])
@@ -63,6 +75,9 @@ if args.decode:
             action_dim=dataset.get_action_dim(), 
             **vars(args))
     model.set_kl_scheduler(n_steps=args.max_epochs*len(train_loader)) 
+
+import pdb
+pdb.set_trace()
 
 if args.align:
     parser.add_argument("--checkpoint_path", type=str, required=True)

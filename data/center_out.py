@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 import pickle
 from typing import Iterable, Tuple
 
@@ -39,4 +40,16 @@ class CenterOutDemonstrationDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         return self.joint_angles[idx], self.actions_joints[idx] 
+    
+    def get_context_dim(self) -> int:
+        return self.joint_angles[0].shape[0]
 
+    def get_action_dim(self) -> int:
+        return self.actions_joints[0].shape[0]
+
+    @staticmethod
+    def add_dataset_specific_args(parent_parser):
+        parser = ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("--radius_cutoff", type=float, default=np.inf)
+        parser.add_argument("--size_limit", type=int)
+        return parser
