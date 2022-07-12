@@ -40,7 +40,8 @@ if args.dataset == "center_out":
     dataset = CenterOutDemonstrationDataset(
         "data/demonstration_center_out.pkl",
         radius_cutoff=args.radius_cutoff,
-        size_limit=args.size_limit)
+        size_limit=args.size_limit,
+        subtract_neutral_from_context=args.subtract_neutral_from_context)
 elif args.dataset == "pick_and_place":
     parser = PickAndPlaceDemonstrationDataset.add_dataset_specific_args(parser)
     args, _ = parser.parse_known_args()
@@ -75,9 +76,6 @@ if args.decode:
             action_dim=dataset.get_action_dim(), 
             **vars(args))
     model.set_kl_scheduler(n_steps=args.max_epochs*len(train_loader)) 
-
-import pdb
-pdb.set_trace()
 
 if args.align:
     parser.add_argument("--checkpoint_path", type=str, required=True)

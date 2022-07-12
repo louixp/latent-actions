@@ -11,7 +11,8 @@ class CenterOutDemonstrationDataset(Dataset):
     def __init__(self, 
             path: str, *, 
             radius_cutoff: float = np.inf,
-            size_limit: int = None):
+            size_limit: int = None,
+            subtract_neutral_from_context: bool = False):
         
         with open(path, "rb") as fp:
             episodes = pickle.load(fp)
@@ -28,7 +29,11 @@ class CenterOutDemonstrationDataset(Dataset):
                 step['previous_joint_angles']
                 for episode in episodes for step in episode 
                 if step['radius'] < radius_cutoff], dtype=torch.float)
-
+        
+        if subtract_neutral_from_context:
+            self.joint_angles -= torch.tensor(
+                    [0., 0.41, 0., -1.85, 0., 2.26, 0.79])
+        
         assert(len(self.actions_joints) == len(self.actions_ee) == len(self.joint_angles))
 
         if size_limit is not None:
@@ -52,4 +57,5 @@ class CenterOutDemonstrationDataset(Dataset):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
         parser.add_argument("--radius_cutoff", type=float, default=np.inf)
         parser.add_argument("--size_limit", type=int)
+        parser.add_argument("--subtract_neutral_from_context", action="store_true")
         return parser
