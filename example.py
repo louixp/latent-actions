@@ -9,10 +9,50 @@ import torch
 import gym
 import panda_gym
 
-from cvae import vae, cvae, gbc, aligned_decoder 
+from cvae import vae, cvae, cae, gbc, aligned_decoder 
 from controller import Controller
+from data.pick_and_place import PickAndPlaceDemonstrationDataset
 import visualization
 
+
+def find_latent_window(data_path: str, decoder: vae.VAE):
+    dataset = PickAndPlaceDemonstrationDataset(
+            data_path, include_goal=False, include_joint_angles=False, 
+            dof=decoder.action_dim - 1, keep_success=False)
+    
+    x_max, y_max = -np.inf, -np.inf
+    x_min, y_min = np.inf, np.inf
+
+    for context, action in dataset:
+        x = torch.cat((context, action)).reshape(1, -1)
+        z = decoder.encoder(x)
+        if not hasattr(decoder, 'fc_mu'):
+            # AE with no mean and variance
+            upper_bound = lower_bound = z.squeeze()
+        else:
+            # VAE with mean and variance
+            mu = decoder.fc_mu(x)
+            log_var = decoder.fc_var(x)
+            std = torch.exp(log_var / 2)
+            
+            upper_bound = (mu + std).unsqueeze()
+            lower_bound = (mu - std).unsqueeze()
+
+        x_max = max(x_max, upper_bound[0])
+        y_max = max(y_max, upper_bound[1])
+        x_min = min(x_min, lower_bound[0])
+        y_min = min(y_min, lower_bound[1])
+    
+    x_center = (x_max + x_min) / 2
+    y_center = (y_max + y_min) / 2
+    x_scale = (x_max - x_min) / 2
+    y_scale = (y_max - y_min) / 2
+
+    return {
+            'x_center': x_center.item(), 
+            'y_center': y_center.item(),
+            'x_scale': x_scale.item(),
+            'y_scale': y_scale.item()}
 
 def simulate(
         decoder: vae.VAE, 
@@ -64,9 +104,8 @@ if __name__ == '__main__':
     # TODO: Figure out a better way to write this.
     parser.add_argument(
             '--model_class', default='VAE', type=str, 
-            choices=['VAE', 'cVAE', 'gBC', 'align'])
+            choices=['VAE', 'cVAE', 'cAE', 'gBC', 'align'])
     parser.add_argument('--checkpoint_path', default=None, type=str)
-    parser.add_argument('--action_scale', default=10, type=int)
     parser.add_argument('--step_rate', default=0.1, type=float)
     args = parser.parse_args()
 
@@ -76,6 +115,8 @@ if __name__ == '__main__':
         ModelClass = gbc.GaussianBC
     elif args.model_class == 'cVAE':
         ModelClass = cvae.ConditionalVAE
+    elif args.model_class == 'cAE':
+        ModelClass = cae.ConditionalAE
     elif args.model_class == 'align':
         ModelClass = aligned_decoder.AlignedDecoder
     
@@ -85,6 +126,9 @@ if __name__ == '__main__':
     else:
         decoder = ModelClass()
         print('Random decoder instantiated.')
+
+    import pdb
+    pdb.set_trace()
 
     if decoder.action_dim == 8:
         simulate(
