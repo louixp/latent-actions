@@ -19,15 +19,20 @@ def visualize_latent_actions_in_3d(
             [int, vae.VAE, mp.connection.Connection, matplotlib.axes.Axes, 
                 np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray], 
             None],
-        action_scale: int,
+        x_center: float, 
+        y_center: float,
+        x_scale: float,
+        y_scale: float,
         grid_size: int):
-    grid_step = action_scale / grid_size
-    x, y, z = np.meshgrid(np.arange(-action_scale, action_scale, grid_step),
-                          np.arange(-action_scale, action_scale, grid_step),
+    x_step = x_scale / grid_size
+    y_step = y_scale / grid_size
+    x, y, z = np.meshgrid(np.arange(-x_scale, x_scale, x_step),
+                          np.arange(-x_scale, y_scale, y_step),
                           0)
     latent_actions = np.concatenate((x, y), axis=-1)
     latent_actions = torch.from_numpy(latent_actions.reshape((-1, 2))).float() 
-    latent_actions *= action_scale
+    latent_actions[:, 0] += x_center
+    latent_actions[:, 1] += y_center
     norm = np.linalg.norm(latent_actions, axis=-1)
 
     fig = plt.figure()
@@ -35,7 +40,7 @@ def visualize_latent_actions_in_3d(
     ani = FuncAnimation(
             fig, plot_function, 
             fargs=(decoder, conn, ax, latent_actions, x, y, z, norm, 
-                action_scale),
+                x_scale),
             interval=1)
     plt.show()
 

@@ -8,17 +8,24 @@ class ExitException(Exception):
     pass
 
 
-class Controller:
+class JoystickController:
 
-    def __init__(self, scale: int = 1, DoF: int = 2):
+    def __init__(self, 
+            x_center: float, 
+            y_center: float,
+            x_scale: float,
+            y_scale: float):
+        
         pygame.init()
         pygame.joystick.init()
 
         self.joystick = pygame.joystick.Joystick(0)
         self.joystick.init()
-
-        self.scale = scale
-        self.DoF = DoF
+        
+        self.x_center = x_center
+        self.y_center = y_center
+        self.x_scale = x_scale
+        self.y_scale = y_scale
 
     def get_action(self) -> torch.Tensor:
         pygame.event.get()
@@ -26,16 +33,13 @@ class Controller:
         if self.joystick.get_button(8):
             raise ExitException('Back button pushed. Exiting Simulation.')
 
-        axes = [self.joystick.get_axis(0), 
-                self.joystick.get_axis(1), 
-                self.joystick.get_axis(2), 
-                self.joystick.get_axis(1)]
-        action = torch.tensor([axes[:self.DoF]])
-        return self.scale * action
+        return torch.tensor([[
+                self.joystick.get_axis(0) * self.x_scale + self.x_center, 
+                self.joystick.get_axis(1) * self.y_scale + self.y_center]])
 
 
 if __name__ == '__main__':
-    joystick = Controller().joystick
+    joystick = JoystickController(1, 1, 1, 1).joystick
     print('Buttons\t', end='\t')
     print('Axes')
 

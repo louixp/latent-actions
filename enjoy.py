@@ -10,7 +10,7 @@ import gym
 import panda_gym
 
 from cvae import vae, cvae, cae, gbc, aligned_decoder 
-from controller import Controller
+from controllers.joystick import JoystickController
 from data.pick_and_place import PickAndPlaceDemonstrationDataset
 import visualization
 
@@ -57,10 +57,17 @@ def find_latent_window(data_path: str, decoder: vae.VAE):
 def simulate(
         decoder: vae.VAE, 
         conns: Iterable[mp.connection.Connection],
-        action_scale: int,
+        x_center: float,
+        y_center: float,
+        x_scale: float,
+        y_scale: float,
         step_rate: float,
         env_id: str):
-    controller = Controller(scale=action_scale)
+    controller = JoystickController(
+            x_center=x_center, 
+            y_center=y_center,
+            x_scale=x_scale,
+            y_scale=y_scale)
 
     env = gym.make(env_id, render=True).env
     obs = env.reset()
@@ -105,7 +112,9 @@ if __name__ == '__main__':
     parser.add_argument(
             '--model_class', default='VAE', type=str, 
             choices=['VAE', 'cVAE', 'cAE', 'gBC', 'align'])
-    parser.add_argument('--checkpoint_path', default=None, type=str)
+    parser.add_argument(
+            '--checkpoint_path', default=None, type=str, required=True)
+    parser.add_argument('--data_path', default=None, type=str, required=True)
     parser.add_argument('--step_rate', default=0.1, type=float)
     args = parser.parse_args()
 
@@ -120,20 +129,19 @@ if __name__ == '__main__':
     elif args.model_class == 'align':
         ModelClass = aligned_decoder.AlignedDecoder
     
-    if args.checkpoint_path is not None:
-        decoder = ModelClass.load_from_checkpoint(args.checkpoint_path)
-        print('Decoder loaded.')
-    else:
-        decoder = ModelClass()
-        print('Random decoder instantiated.')
-
-    import pdb
-    pdb.set_trace()
+    decoder = ModelClass.load_from_checkpoint(args.checkpoint_path)
+    print('Decoder loaded.')
+    
+    latent_window = find_latent_window(args.data_path, decoder)
+    print(f'Latent window: {latent_window}')
 
     if decoder.action_dim == 8:
         simulate(
-                decoder, [], args.action_scale, args.step_rate, 
-                'PandaPickAndPlaceJoints-v2')
+                decoder=decoder, 
+                conns=[], 
+                step_rate=args.step_rate, 
+                env_id='PandaPickAndPlaceJoints-v2',
+                **latent_window)
 
     elif decoder.action_dim == 4:
         if platform.system() == 'Darwin':
@@ -145,16 +153,36 @@ if __name__ == '__main__':
         p_sim = mp.Process(
                 target=simulate, 
                 args=(
-                    decoder, [conn_send_1, conn_send_2], args.action_scale, 
-                    args.step_rate, 'PandaPickAndPlace-v1'))
+                    decoder, 
+                    [conn_send_1, conn_send_2], 
+                    latent_window['x_center'],
+                    latent_window['y_center'],
+                    latent_window['x_scale'],
+                    latent_window['y_scale'],
+                    args.step_rate, 
+                    'PandaPickAndPlace-v1'))
         p_viz_vec = mp.Process(
                 target=visualization.visualize_latent_actions_in_3d, 
-                args=(decoder, conn_recv_1, visualization.plot_vector_field, 
-                    args.action_scale, 5))
+                args=(
+                    decoder, 
+                    conn_recv_1, 
+                    visualization.plot_vector_field, 
+                    latent_window['x_center'],
+                    latent_window['y_center'],
+                    latent_window['x_scale'],
+                    latent_window['y_scale'],
+                    5))
         p_viz_man = mp.Process(
                 target=visualization.visualize_latent_actions_in_3d, 
-                args=(decoder, conn_recv_2, visualization.plot_manifold,
-                    args.action_scale, 10))
+                args=(
+                    decoder, 
+                    conn_recv_2, 
+                    visualization.plot_manifold,
+                    latent_window['x_center'],
+                    latent_window['y_center'],
+                    latent_window['x_scale'],
+                    latent_window['y_scale'],
+                    10))
 
         p_sim.start()
         p_viz_vec.start()
