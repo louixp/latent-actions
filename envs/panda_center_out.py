@@ -16,11 +16,22 @@ class PandaCenterOutEnv(RobotTaskEnv):
             Defaults to "ee".
     """
 
-    def __init__(self, render: bool = False, reward_type: str = "sparse", control_type: str = "ee", goal_range: int = 0.3) -> None:
+    def __init__(self, 
+            render: bool = False, 
+            reward_type: str = "sparse", 
+            control_type: str = "ee", 
+            goal_range: int = 0.3,
+            dimension: int = 2) -> None:
         sim = PyBullet(render=render)
-        robot = Panda(sim, block_gripper=True, base_position=np.array([-0.6, 0.0, 0.0]), control_type=control_type)
+        robot = Panda(
+                sim, block_gripper=True, 
+                base_position=np.array([-0.6, 0.0, 0.0]), 
+                control_type=control_type)
         robot.reset() # Brings the robot to neutral starting position.
-        task = CenterOut(sim, reward_type=reward_type, get_ee_position=robot.get_ee_position, goal_range=goal_range)
+        task = CenterOut(
+                sim, reward_type=reward_type, 
+                get_ee_position=robot.get_ee_position, goal_range=goal_range,
+                dimension=dimension)
         task.set_ee_position(robot.get_ee_position())
         super().__init__(robot, task)
 

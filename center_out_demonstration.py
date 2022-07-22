@@ -1,3 +1,4 @@
+import argparse
 import pickle
 
 import numpy as np
@@ -5,9 +6,13 @@ from tqdm import tqdm
 
 from envs.panda_center_out import PandaCenterOutEnv
 
-N_STEPS = 100000
 
-env = PandaCenterOutEnv()
+parser = argparse.ArgumentParser()
+parser.add_argument('--dimension', type=int, choices=[2, 3], default=2)
+parser.add_argument('--n_steps', type=int, default=100000)
+args = parser.parse_args()
+
+env = PandaCenterOutEnv(dimension=args.dimension)
 
 def ee_displacement_to_arm_joint_ctrl(env_ee, action_ee):
     action_clipped = np.clip(
@@ -24,8 +29,8 @@ def ee_displacement_to_arm_joint_ctrl(env_ee, action_ee):
 episodes = []
 steps = 0
 
-with tqdm(total=N_STEPS) as pbar:
-    while steps < N_STEPS:
+with tqdm(total=args.n_steps) as pbar:
+    while steps < args.n_steps:
         obs = env.reset()
         neutral_position = obs['achieved_goal']
         is_success = False
