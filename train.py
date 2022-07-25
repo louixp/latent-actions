@@ -13,6 +13,7 @@ from cvae.gbc import GaussianBC
 from cvae.vae import VAE
 from data.center_out import CenterOutDemonstrationDataset
 from data.pick_and_place import PickAndPlaceDemonstrationDataset
+from data.real_center_out import RealCenterOutDemonstrationDataset
 
 
 parser = ArgumentParser()
@@ -29,7 +30,8 @@ parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--max_epochs", type=int, default=400)
 parser.add_argument("--no_wandb", action="store_true")
 parser.add_argument(
-        "--dataset", required=True, choices=["pick_and_place", "center_out"])
+        "--dataset", required=True, 
+        choices=["pick_and_place", "center_out", "real_center_out"])
 
 args, _ = parser.parse_known_args()
 assert(args.decode != args.align)
@@ -52,6 +54,9 @@ elif args.dataset == "pick_and_place":
             dof=args.dof, 
             keep_success=args.keep_success, 
             size_limit=args.size_limit)
+elif args.dataset == "real_center_out":
+    dataset = RealCenterOutDemonstrationDataset(
+            "data/demonstration_real_center_out.pkl")
 
 if args.model_class == "VAE":
     ModelClass = VAE
