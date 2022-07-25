@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import gym
 import panda_gym
+from frankapy import FrankaArm
 
 from latent_actions.cvae import vae, cvae, cae, gbc, aligned_decoder 
 from latent_actions.controllers.joystick import JoystickController
@@ -54,21 +55,35 @@ def find_latent_window(data_path: str, decoder: vae.VAE):
             'x_scale': x_scale.item(),
             'y_scale': y_scale.item()}
 
+def deploy_real_arm(
+        decoder: vae.VAE, 
+        controller: JoystickController):
+    fa = FrankaArm()
+    
+    while True:
+        try:
+            latent_action = controller.get_action()
+        except Exception as e:
+            print('Exiting...')
+            return 
+        
+        curr_pose = fa.get_pose()
+        curr_joints = fa.get_joints()
+        
+        action = decoder(latent=torch.tensor(latent_action), context=None)
+        action = np.squeeze(action.detach().numpy())
+
+        curr_pose.from_frame = 'world'
+        curr_pose.rotation = np.eye(3)
+        fa.goto_joints(
+                curr_joints + action, duration=3, ignore_virtual_walls=True)
+
 def simulate(
         decoder: vae.VAE, 
+        controller: JoystickController,
         conns: Iterable[mp.connection.Connection],
-        x_center: float,
-        y_center: float,
-        x_scale: float,
-        y_scale: float,
         step_rate: float,
         env_id: str):
-    controller = JoystickController(
-            x_center=x_center, 
-            y_center=y_center,
-            x_scale=x_scale,
-            y_scale=y_scale)
-
     env = gym.make(env_id, render=True).env
     obs = env.reset()
 
@@ -110,6 +125,8 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     # TODO: Figure out a better way to write this.
     parser.add_argument(
+            '--deploy_target', type=str, required=True, choices=['real', 'sim'])
+    parser.add_argument(
             '--model_class', default='VAE', type=str, 
             choices=['VAE', 'cVAE', 'cAE', 'gBC', 'align'])
     parser.add_argument(
@@ -134,6 +151,11 @@ if __name__ == '__main__':
     
     latent_window = find_latent_window(args.data_path, decoder)
     print(f'Latent window: {latent_window}')
+    
+    controller = JoystickController(**latent_window)
+
+    if args.deploy_target == 'real':
+        deploy_real_arm(decoder, controller)
 
     if decoder.action_dim == 8:
         simulate(
