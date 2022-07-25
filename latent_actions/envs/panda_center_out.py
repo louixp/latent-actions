@@ -4,7 +4,7 @@ from panda_gym.envs.core import RobotTaskEnv
 from panda_gym.envs.robots.panda import Panda
 from panda_gym.pybullet import PyBullet
 
-from envs.center_out import CenterOut 
+from latent_actions.envs.center_out import CenterOut 
 
 
 class PandaCenterOutEnv(RobotTaskEnv):

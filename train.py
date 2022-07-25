@@ -6,14 +6,14 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.utilities.model_summary import ModelSummary
 
-from cvae.aligned_decoder import AlignedDecoder
-from cvae.cae import ConditionalAE
-from cvae.cvae import ConditionalVAE
-from cvae.gbc import GaussianBC 
-from cvae.vae import VAE
-from data.center_out import CenterOutDemonstrationDataset
-from data.pick_and_place import PickAndPlaceDemonstrationDataset
-from data.real_center_out import RealCenterOutDemonstrationDataset
+from latent_actions.cvae.aligned_decoder import AlignedDecoder
+from latent_actions.cvae.cae import ConditionalAE
+from latent_actions.cvae.cvae import ConditionalVAE
+from latent_actions.cvae.gbc import GaussianBC 
+from latent_actions.cvae.vae import VAE
+from latent_actions.data.center_out import CenterOutDemonstrationDataset
+from latent_actions.data.pick_and_place import PickAndPlaceDemonstrationDataset
+from latent_actions.data.real_center_out import RealCenterOutDemonstrationDataset
 
 
 parser = ArgumentParser()

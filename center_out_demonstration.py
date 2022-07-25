@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 
-from envs.panda_center_out import PandaCenterOutEnv
+from latent_actions.envs.panda_center_out import PandaCenterOutEnv
 
 
 parser = argparse.ArgumentParser()

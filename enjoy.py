@@ -9,10 +9,10 @@ import torch
 import gym
 import panda_gym
 
-from cvae import vae, cvae, cae, gbc, aligned_decoder 
-from controllers.joystick import JoystickController
-from data.pick_and_place import PickAndPlaceDemonstrationDataset
-import visualization
+from latent_actions.cvae import vae, cvae, cae, gbc, aligned_decoder 
+from latent_actions.controllers.joystick import JoystickController
+from latent_actions.data.pick_and_place import PickAndPlaceDemonstrationDataset
+from latent_actions import visualization
 
 
 def find_latent_window(data_path: str, decoder: vae.VAE):

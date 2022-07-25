@@ -9,7 +9,7 @@ from matplotlib.animation import FuncAnimation
 import numpy as np
 import torch
 
-from cvae import vae 
+from latent_actions.cvae import vae 
 
 
 def visualize_latent_actions_in_3d(
