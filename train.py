@@ -6,11 +6,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.utilities.model_summary import ModelSummary
 
-from latent_actions.cvae.aligned_decoder import AlignedDecoder
-from latent_actions.cvae.cae import ConditionalAE
-from latent_actions.cvae.cvae import ConditionalVAE
-from latent_actions.cvae.gbc import GaussianBC 
-from latent_actions.cvae.vae import VAE
+from latent_actions import cvae
 from latent_actions.data.center_out import CenterOutDemonstrationDataset
 from latent_actions.data.pick_and_place import PickAndPlaceDemonstrationDataset
 from latent_actions.data.real_center_out import RealCenterOutDemonstrationDataset
@@ -23,7 +19,7 @@ deocde_align_group.add_argument("--align", action="store_true")
 
 parser.add_argument(
         "--model_class", default="cVAE", type=str, 
-        choices=["VAE", "cVAE", "cAE", "gBC"])
+        choices=cvae.DECODER_CLASS.keys())
 parser.add_argument("--batch_size", type=int, default=32)
 # NOTE: Trainer.add_argparse_args(parser) kind of pollutes the 
 #   hyperparameter space.
@@ -58,14 +54,7 @@ elif args.dataset == "real_center_out":
     dataset = RealCenterOutDemonstrationDataset(
             "data/demonstration_real_center_out.pkl")
 
-if args.model_class == "VAE":
-    ModelClass = VAE
-elif args.model_class == "cAE":
-    ModelClass = ConditionalAE
-elif args.model_class == "gBC":
-    ModelClass = GaussianBC
-else:
-    ModelClass = ConditionalVAE
+ModelClass = cvae.DECODER_CLASS[args.model_class]
 
 train_set, test_set = torch.utils.data.random_split(
         dataset, [int(len(dataset) * .8), len(dataset) - int(len(dataset) * .8)])
