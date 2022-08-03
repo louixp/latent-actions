@@ -8,15 +8,16 @@ from torch.utils.data import Dataset
 class PickAndPlaceDemonstrationDataset(Dataset):
 
     def __init__(self, 
-            path: str, *,
+            data_path: str, *,
             include_goal: bool,
             include_joint_angles: bool,
             dof: int,
             keep_success: bool, 
-            size_limit: int = None):
-        print(f"Initializing DemonstrationDataset with arguements: {locals()}")
+            size_limit: int = None,
+            **kwargs):
+        print(f"Initializing PickAndPlaceDemonstrationDataset with: {locals()}")
         
-        with open(path, "rb") as fp:
+        with open(data_path, "rb") as fp:
             data = pickle.load(fp)
             episodes = data["episodes"]
             rewards = data["rewards"]
@@ -78,6 +79,7 @@ class PickAndPlaceDemonstrationDataset(Dataset):
     @staticmethod
     def add_dataset_specific_args(parent_parser):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("--data_path", type=str, required=True)
         parser.add_argument("--include_goal", action="store_true")
         parser.add_argument("--include_joint_angles", action="store_true")
         parser.add_argument("--dof", type=int, default=3, choices=(3, 7))

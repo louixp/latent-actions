@@ -6,10 +6,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.utilities.model_summary import ModelSummary
 
-from latent_actions import cvae
-from latent_actions.data.center_out import CenterOutDemonstrationDataset
-from latent_actions.data.pick_and_place import PickAndPlaceDemonstrationDataset
-from latent_actions.data.real_center_out import RealCenterOutDemonstrationDataset
+from latent_actions import cvae, data
 
 
 parser = ArgumentParser()
@@ -26,36 +23,16 @@ parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--max_epochs", type=int, default=400)
 parser.add_argument("--no_wandb", action="store_true")
 parser.add_argument(
-        "--dataset", required=True, 
-        choices=["pick_and_place", "center_out", "real_center_out"])
-
+        "--dataset", required=True, choices=data.DATASET_CLASS.keys())
 args, _ = parser.parse_known_args()
-assert(args.decode != args.align)
 
-if args.dataset == "center_out":
-    parser = CenterOutDemonstrationDataset.add_dataset_specific_args(parser)
-    args, _ = parser.parse_known_args()
-    dataset = CenterOutDemonstrationDataset(
-        "data/demonstration_center_out.pkl",
-        radius_cutoff=args.radius_cutoff,
-        size_limit=args.size_limit,
-        subtract_neutral_from_context=args.subtract_neutral_from_context)
-elif args.dataset == "pick_and_place":
-    parser = PickAndPlaceDemonstrationDataset.add_dataset_specific_args(parser)
-    args, _ = parser.parse_known_args()
-    dataset = PickAndPlaceDemonstrationDataset(
-            "data/demonstration-7dof.pkl", 
-            include_goal=args.include_goal, 
-            include_joint_angles=args.include_joint_angles,
-            dof=args.dof, 
-            keep_success=args.keep_success, 
-            size_limit=args.size_limit)
-elif args.dataset == "real_center_out":
-    dataset = RealCenterOutDemonstrationDataset(
-            "data/demonstration_real_center_out.pkl")
-
+DataClass = data.DATASET_CLASS[args.dataset]
 ModelClass = cvae.DECODER_CLASS[args.model_class]
 
+parser = DataClass.add_dataset_specific_args(parser)
+args, _ = parser.parse_known_args()
+
+dataset = DataClass(**vars(args))
 train_set, test_set = torch.utils.data.random_split(
         dataset, [int(len(dataset) * .8), len(dataset) - int(len(dataset) * .8)])
 train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)

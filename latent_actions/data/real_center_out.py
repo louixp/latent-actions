@@ -9,9 +9,10 @@ from torch.utils.data import Dataset
 class RealCenterOutDemonstrationDataset(Dataset):
 
     def __init__(self, 
-            path: str):
+            data_path: str,
+            **kwargs):
         
-        with open(path, "rb") as fp:
+        with open(data_path, "rb") as fp:
             episodes = pickle.load(fp)
 
         self.actions_joints = torch.tensor([
@@ -37,4 +38,6 @@ class RealCenterOutDemonstrationDataset(Dataset):
 
     @staticmethod
     def add_dataset_specific_args(parent_parser):
+        parser = ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("--data_path", type=str, required=True)
         return parser

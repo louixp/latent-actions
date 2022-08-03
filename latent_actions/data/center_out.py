@@ -9,12 +9,14 @@ from torch.utils.data import Dataset
 class CenterOutDemonstrationDataset(Dataset):
 
     def __init__(self, 
-            path: str, *, 
+            data_path: str, *, 
             radius_cutoff: float = np.inf,
             size_limit: int = None,
-            subtract_neutral_from_context: bool = False):
+            subtract_neutral_from_context: bool = False,
+            **kwargs):
+        print(f"Initializing CenterOutDemonstrationDataset with: {locals()}")
         
-        with open(path, "rb") as fp:
+        with open(data_path, "rb") as fp:
             episodes = pickle.load(fp)
 
         self.actions_joints = torch.tensor([
@@ -55,6 +57,7 @@ class CenterOutDemonstrationDataset(Dataset):
     @staticmethod
     def add_dataset_specific_args(parent_parser):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("--data_path", type=str, required=True)
         parser.add_argument("--radius_cutoff", type=float, default=np.inf)
         parser.add_argument("--size_limit", type=int)
         parser.add_argument("--subtract_neutral_from_context", action="store_true")
