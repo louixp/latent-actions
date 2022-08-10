@@ -5,14 +5,17 @@ import numpy as np
 from tqdm import tqdm
 
 from latent_actions.envs.panda_center_out import PandaCenterOutEnv
+from latent_actions.dataset import Step, Episode, EpisodicDataset
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dimension', type=int, choices=[2, 3], default=2)
+parser.add_argument('--ee_vel_profile', type=str, 
+        choices=['gaussian', 'uniform', 'exponential'])
 parser.add_argument('--n_steps', type=int, default=100000)
 args = parser.parse_args()
 
-env = PandaCenterOutEnv(dimension=args.dimension)
+env = PandaCenterOutEnv(dimension=args.dimension, render=True)
 
 def ee_displacement_to_arm_joint_ctrl(env_ee, action_ee):
     action_clipped = np.clip(
@@ -26,8 +29,8 @@ def ee_displacement_to_arm_joint_ctrl(env_ee, action_ee):
     arm_joint_ctrl = target_arm_angles - current_arm_joint_angles
     return arm_joint_ctrl * 20
 
-episodes = []
 steps = 0
+episodic_dataset = EpisodicDataset()
 
 with tqdm(total=args.n_steps) as pbar:
     while steps < args.n_steps:
@@ -35,31 +38,42 @@ with tqdm(total=args.n_steps) as pbar:
         neutral_position = obs['achieved_goal']
         is_success = False
 
-        episode = []
-
+        episode = Episode()        
         while not is_success:
             action_ee = obs['desired_goal'] - obs['achieved_goal']
+            
+            if args.ee_vel_profile != 'exponential':
+                action_ee_direction = action_ee / np.linalg.norm(action_ee)
+                radius = np.linalg.norm(
+                        obs['achieved_goal'] - neutral_position, ord=np.inf)
+                action_ee_magnitude = 0.015 
+                if args.ee_vel_profile == 'gaussian':
+                    action_ee_magnitude *= np.exp(-(radius - 0.06) ** 2 / 0.002) + 0.01
+                action_ee = action_ee_direction * action_ee_magnitude
+
             action_ee = np.clip(
                     action_ee, env.robot.action_space.low, 
                     env.robot.action_space.high)
             action_joints = ee_displacement_to_arm_joint_ctrl(env, action_ee)
-            
-            episode.append({
-                'action_ee': action_ee,
-                'action_joints': action_joints,
-                'previous_observation': obs,
-                'previous_joint_angles': np.array([
-                    env.robot.get_joint_angle(joint=i) for i in range(7)]),
-                # Infinity norm gives us boxes for data segmentation
-                'radius': np.linalg.norm(
-                    obs['achieved_goal'] - neutral_position, ord=np.inf)}) 
 
+            step = Step(
+                    joint_velocity=action_joints, 
+                    ee_velocity=action_ee, 
+                    context={
+                        'previous_observation': obs,
+                        'previous_joint_angles': np.array([
+                            env.robot.get_joint_angle(joint=i) for i in range(7)]),
+                        'radius': radius}) 
+            
             obs, reward, done, info = env.step(action_ee)
+            
             is_success = info['is_success']
+            step.context['is_success'] = is_success
+            episode.append(step)
+
             steps += 1
             pbar.update(1)
 
-        episodes.append(episode)
+        episodic_dataset.append(episode)
 
-with open('demonstration_center_out.pkl', 'wb') as fp:
-    pickle.dump(episodes, fp)
+episodic_dataset.dump('demonstration_center_out.pkl')
