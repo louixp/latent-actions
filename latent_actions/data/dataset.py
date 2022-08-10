@@ -28,7 +28,8 @@ class Episode:
 @dataclass
 class EpisodicDataset:
     """EpisodicDataset defines a generic data structure that encompasses all 
-    data collected on real or simulated robot, across all tasks.
+    data collected on real or simulated robot, across all tasks, for both 
+    decoder and alignment training.
     """
     episodes: List[Episode] = field(default_factory=list) 
 
@@ -45,7 +46,9 @@ class EpisodicDataset:
     @staticmethod
     def load(data_path: str):
         with open(data_path, "rb") as fp:
-            return pickle.load(fp)
+            episodic_dataset = pickle.load(fp)
+        assert(isinstance(episodic_dataset, EpisodicDataset))
+        return episodic_dataset
 
 
 class DemonstrationDataset(Dataset):
@@ -56,33 +59,37 @@ class DemonstrationDataset(Dataset):
             episodic_dataset: EpisodicDataset, 
             action_space: str, 
             size_limit: int,
+            exclude_gripper: bool,
             **kwargs):
         
         excluded_context_keys = set(
                 local_var_key[len("exclude_context_feature_"):] 
                 for local_var_key in locals() 
                 if local_var_key.startswith("exclude_context_feature_"))
+       
         self.contexts = np.array([
-                [ctx_val for ctx_key, ctx_val in contexts.items() 
+                [ctx_val for ctx_key, ctx_val in step.context.items() 
                     if ctx_key not in excluded_context_keys] 
                 for episode in episodic_dataset.episodes 
-                for step in episode.episode])
+                for step in episode.steps])
         
         assert(action_space in ["ee", "joints"])
         if action_space == "ee":
             self.actions = np.array([
-                np.concatenate(step.ee_velocity, step.gripper_velocity)
+                np.concatenate([step.ee_velocity, step.gripper_velocity])
+                if not exclude_gripper else step.ee_velocity
                 for episode in episodic_dataset.episodes 
-                for step in episode.episode])
+                for step in episode.steps])
         else:
             self.actions = np.array([
                 np.concatenate([step.joint_velocity, step.gripper_velocity])
+                if not exclude_gripper else step.joint_velocity
                 for episode in episodic_dataset.episodes 
-                for step in episode.episode])
+                for step in episode.steps])
 
         self.human_actions = np.array([step.human_action
             for episode in episodic_dataset.episodes 
-            for step in episode.episode])
+            for step in episode.steps])
 
         assert(len(self.contexts) == len(self.actions) == len(self.human_actions))
 
@@ -119,6 +126,7 @@ class DemonstrationDataset(Dataset):
             parser.add_argument(
                     f"--exclude_context_feature_{context_key}", 
                     action="store_true") 
+        parser.add_argument("--exclude_gripper", action="store_true")
         parser.add_argument(
                 "--action_space", type=str, choices=["ee", "joints"], 
                 required=True)

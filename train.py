@@ -6,7 +6,8 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.utilities.model_summary import ModelSummary
 
-from latent_actions import cvae, data
+from latent_actions import cvae
+from latent_actions.data.dataset import EpisodicDataset, DemonstrationDataset
 
 
 parser = ArgumentParser()
@@ -18,18 +19,18 @@ parser.add_argument("--batch_size", type=int, default=32)
 #   hyperparameter space.
 parser.add_argument("--max_epochs", type=int, default=400)
 parser.add_argument("--no_wandb", action="store_true")
-parser.add_argument(
-        "--dataset", required=True, choices=data.DATASET_CLASS.keys())
+parser.add_argument("--data_path", type=str, required=True)
 args, _ = parser.parse_known_args()
 
-DataClass = data.DATASET_CLASS[args.dataset]
-ModelClass = cvae.DECODER_CLASS[args.model_class]
+episodic_dataset = EpisodicDataset.load(args.data_path)
+parser = DemonstrationDataset.add_dataset_specific_args(parser, episodic_dataset)
+args, _ = parser.parse_known_args()
+dataset = DemonstrationDataset(episodic_dataset, **vars(args))
 
-parser = DataClass.add_dataset_specific_args(parser)
+ModelClass = cvae.DECODER_CLASS[args.model_class]
 parser = ModelClass.add_model_specific_args(parser)
 args = parser.parse_args()
 
-dataset = DataClass(**vars(args))
 train_set, test_set = torch.utils.data.random_split(
         dataset, [int(len(dataset) * .8), len(dataset) - int(len(dataset) * .8)])
 train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
