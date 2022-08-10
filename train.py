@@ -10,10 +10,6 @@ from latent_actions import cvae, data
 
 
 parser = ArgumentParser()
-deocde_align_group = parser.add_mutually_exclusive_group(required=True)
-deocde_align_group.add_argument("--decode", action="store_true")
-deocde_align_group.add_argument("--align", action="store_true")
-
 parser.add_argument(
         "--model_class", default="cVAE", type=str, 
         choices=cvae.DECODER_CLASS.keys())
@@ -30,7 +26,8 @@ DataClass = data.DATASET_CLASS[args.dataset]
 ModelClass = cvae.DECODER_CLASS[args.model_class]
 
 parser = DataClass.add_dataset_specific_args(parser)
-args, _ = parser.parse_known_args()
+parser = ModelClass.add_model_specific_args(parser)
+args = parser.parse_args()
 
 dataset = DataClass(**vars(args))
 train_set, test_set = torch.utils.data.random_split(
@@ -38,22 +35,11 @@ train_set, test_set = torch.utils.data.random_split(
 train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
 test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
 
-if args.decode:
-    parser = ModelClass.add_model_specific_args(parser)
-    args = parser.parse_args()
-
-    model = ModelClass(
-            context_dim=dataset.get_context_dim(), 
-            action_dim=dataset.get_action_dim(), 
-            **vars(args))
-    model.set_kl_scheduler(n_steps=args.max_epochs*len(train_loader)) 
-
-if args.align:
-    parser.add_argument("--checkpoint_path", type=str, required=True)
-    parser = AlignedDecoder.add_model_specific_args(parser)
-    args = parser.parse_args()
-    decoder = ModelClass.load_from_checkpoint(args.checkpoint_path)
-    model = AlignedDecoder(decoder=decoder, **vars(args))
+model = ModelClass(
+        context_dim=dataset.get_context_dim(), 
+        action_dim=dataset.get_action_dim(), 
+        **vars(args))
+model.set_kl_scheduler(n_steps=args.max_epochs*len(train_loader)) 
 
 if not args.no_wandb:
     wandb_logger = WandbLogger(
