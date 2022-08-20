@@ -136,7 +136,7 @@ class VAE(LightningModule):
             choices=["monotonic", "cyclical", "constant"],
             help="KL schedule.")
         parser.add_argument(
-            "--kl_coeff", type=float, default=1,
+            "--kl_coeff", type=float, default=1.0,
             help="KL coeff for constant schedule.")
 
         parser.add_argument("--latent_dim", type=int, default=2)
