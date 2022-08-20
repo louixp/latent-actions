@@ -97,9 +97,9 @@ class VAE(LightningModule):
 
         kl = torch.distributions.kl_divergence(q, p)
         kl = kl.mean()
-        kl *= kl_coeff
+        # kl *= kl_coeff
 
-        loss = kl + recon_loss
+        loss = kl_coeff*kl + recon_loss
 
         logs = {
             "recon_loss": recon_loss,
