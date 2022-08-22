@@ -12,32 +12,32 @@ from frankapy import FrankaArm
 
 from latent_actions.cvae import vae, cvae, cae, gbc, aligned_decoder 
 from latent_actions.controllers.joystick import JoystickController
-from latent_actions.data.pick_and_place import PickAndPlaceDemonstrationDataset
+from latent_actions.data.dataset import EpisodicDataset, DemonstrationDataset
 from latent_actions import visualization
 
 
 def find_latent_window(data_path: str, decoder: vae.VAE):
-    dataset = PickAndPlaceDemonstrationDataset(
-            data_path, include_goal=False, include_joint_angles=False, 
-            dof=decoder.action_dim - 1, keep_success=False)
+    episodic_dataset = EpisodicDataset.load(data_path)
+    dataset = DemonstrationDataset(episodic_dataset, "joints", None, False)
     
     x_max, y_max = -np.inf, -np.inf
     x_min, y_min = np.inf, np.inf
 
-    for context, action in dataset:
-        x = torch.cat((context, action)).reshape(1, -1)
+    for batch in dataset:
+        context, action = torch.Tensor(batch['context']).float(), torch.tensor(batch['action']).float()
+        x = torch.cat((action, context)).reshape(1, -1)
         z = decoder.encoder(x)
         if not hasattr(decoder, 'fc_mu'):
             # AE with no mean and variance
             upper_bound = lower_bound = z.squeeze()
         else:
             # VAE with mean and variance
-            mu = decoder.fc_mu(x)
-            log_var = decoder.fc_var(x)
+            mu = decoder.fc_mu(z)
+            log_var = decoder.fc_var(z)
             std = torch.exp(log_var / 2)
             
-            upper_bound = (mu + std).unsqueeze()
-            lower_bound = (mu - std).unsqueeze()
+            upper_bound = (mu + std).squeeze()
+            lower_bound = (mu - std).squeeze()
 
         x_max = max(x_max, upper_bound[0])
         y_max = max(y_max, upper_bound[1])
@@ -57,8 +57,9 @@ def find_latent_window(data_path: str, decoder: vae.VAE):
 
 def deploy_real_arm(
         decoder: vae.VAE, 
-        controller: JoystickController):
+        latent_window: dict):
     fa = FrankaArm()
+    controller = JoystickController(**latent_window)
     
     while True:
         try:
@@ -70,7 +71,7 @@ def deploy_real_arm(
         curr_pose = fa.get_pose()
         curr_joints = fa.get_joints()
         
-        action = decoder(latent=torch.tensor(latent_action), context=None)
+        action = decoder(latent=torch.tensor(latent_action), context=torch.tensor(curr_joints[:8]))
         action = np.squeeze(action.detach().numpy())
 
         curr_pose.from_frame = 'world'
@@ -80,32 +81,29 @@ def deploy_real_arm(
 
 def simulate(
         decoder: vae.VAE, 
-        controller: JoystickController,
+        latent_window: dict,
         conns: Iterable[mp.connection.Connection],
         step_rate: float,
         env_id: str):
     env = gym.make(env_id, render=True).env
-    obs = env.reset()
+    _ = env.reset()
+
+    controller = JoystickController(**latent_window)
 
     done = False
     while not done:
         try:
             latent_action = controller.get_action()
         except Exception as e:
+            print(e)
             print('Simulation exiting...')
             for conn in conns:
                 conn.send(None)
             return
 
-        context = torch.from_numpy(obs['observation'])
-        if decoder.hparams.get('include_goal'):
-            goal = torch.from_numpy(obs['desired_goal'])
-            context = torch.cat((context, goal))
-        if decoder.hparams.get('include_joint_angles'):
-            joint_angles = torch.tensor([
-                    env.sim.get_joint_angle(env.robot.body_name, i)
-                    for i in range(7)])
-            context = torch.cat((context, joint_angles))
+        context = torch.tensor([
+                env.sim.get_joint_angle(env.robot.body_name, i)
+                for i in range(8)])
 
         context = torch.unsqueeze(context, 0).float()
         for conn in conns:
@@ -115,7 +113,7 @@ def simulate(
         action = action.detach().numpy()
         action = np.squeeze(action)
 
-        obs, reward, done, info = env.step(action)
+        _, _, done, _ = env.step(action)
         sleep(step_rate)
 
     env.close()
@@ -152,18 +150,16 @@ if __name__ == '__main__':
     latent_window = find_latent_window(args.data_path, decoder)
     print(f'Latent window: {latent_window}')
     
-    controller = JoystickController(**latent_window)
-
     if args.deploy_target == 'real':
-        deploy_real_arm(decoder, controller)
+        deploy_real_arm(decoder, latent_window)
 
     if decoder.action_dim == 8:
         simulate(
-                decoder=decoder, 
-                conns=[], 
-                step_rate=args.step_rate, 
-                env_id='PandaPickAndPlaceJoints-v2',
-                **latent_window)
+            decoder=decoder,
+            latent_window=latent_window,
+            conns=[],
+            step_rate=args.step_rate,
+            env_id='PandaPickAndPlaceJoints-v2')
 
     elif decoder.action_dim == 4:
         if platform.system() == 'Darwin':
@@ -173,16 +169,13 @@ if __name__ == '__main__':
         conn_recv_2, conn_send_2 = mp.Pipe(duplex=False)
 
         p_sim = mp.Process(
-                target=simulate, 
-                args=(
-                    decoder, 
-                    [conn_send_1, conn_send_2], 
-                    latent_window['x_center'],
-                    latent_window['y_center'],
-                    latent_window['x_scale'],
-                    latent_window['y_scale'],
-                    args.step_rate, 
-                    'PandaPickAndPlace-v1'))
+            target=simulate,
+            args=(
+                decoder,
+                latent_window,
+                [conn_send_1, conn_send_2],
+                args.step_rate,
+                'PandaPickAndPlace-v1'))
         p_viz_vec = mp.Process(
                 target=visualization.visualize_latent_actions_in_3d, 
                 args=(
