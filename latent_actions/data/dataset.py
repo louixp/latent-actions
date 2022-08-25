@@ -64,13 +64,18 @@ class DemonstrationDataset(Dataset):
                  exclude_gripper: bool,
                  **kwargs):
 
+        # excluded_context_keys = set(
+        #     local_var_key[len("exclude_context_feature_"):]
+        #     for local_var_key, local_var_value in locals().items()
+        #     if local_var_key.startswith("exclude_context_feature_") if local_var_value)
+
         excluded_context_keys = set(
             local_var_key[len("exclude_context_feature_"):]
-            for local_var_key in locals()
-            if local_var_key.startswith("exclude_context_feature_"))
+            for local_var_key, local_var_value in locals()['kwargs'].items()
+            if local_var_key.startswith("exclude_context_feature_") if local_var_value)
 
         self.contexts = np.array([
-            np.hstack([ctx_val if type(ctx_val) == np.ndarray else np.array([ctx_val]) for ctx_key, ctx_val in step.context.items()
+            np.concatenate([ctx_val for ctx_key, ctx_val in step.context.items()
                       if ctx_key not in excluded_context_keys])
             for episode in episodic_dataset.episodes
             for step in episode.steps])
@@ -79,14 +84,14 @@ class DemonstrationDataset(Dataset):
         if action_space == "ee":
             self.actions = np.array([
                 np.concatenate(
-                    [step.ee_velocity, np.array([step.gripper_velocity])])
+                    [step.ee_velocity, step.gripper_velocity])
                 if not exclude_gripper else step.ee_velocity
                 for episode in episodic_dataset.episodes
                 for step in episode.steps])
         else:
             self.actions = np.array([
                 np.concatenate(
-                    [step.joint_velocity, np.array([step.gripper_velocity])])
+                    [step.joint_velocity, step.gripper_velocity])
                 if not exclude_gripper else step.joint_velocity
                 for episode in episodic_dataset.episodes
                 for step in episode.steps])

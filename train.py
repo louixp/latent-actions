@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 
 import torch
 from torch.utils.data import DataLoader
-from pytorch_lightning import Trainer 
+from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.utilities.model_summary import ModelSummary
 
@@ -12,10 +12,10 @@ from latent_actions.data.dataset import EpisodicDataset, DemonstrationDataset
 
 parser = ArgumentParser()
 parser.add_argument(
-        "--model_class", default="cVAE", type=str, 
-        choices=cvae.DECODER_CLASS.keys())
+    "--model_class", default="cVAE", type=str,
+    choices=cvae.DECODER_CLASS.keys())
 parser.add_argument("--batch_size", type=int, default=32)
-# NOTE: Trainer.add_argparse_args(parser) kind of pollutes the 
+# NOTE: Trainer.add_argparse_args(parser) kind of pollutes the
 #   hyperparameter space.
 parser.add_argument("--max_epochs", type=int, default=400)
 parser.add_argument("--no_wandb", action="store_true")
@@ -23,7 +23,8 @@ parser.add_argument("--data_path", type=str, required=True)
 args, _ = parser.parse_known_args()
 
 episodic_dataset = EpisodicDataset.load(args.data_path)
-parser = DemonstrationDataset.add_dataset_specific_args(parser, episodic_dataset)
+parser = DemonstrationDataset.add_dataset_specific_args(
+    parser, episodic_dataset)
 args, _ = parser.parse_known_args()
 dataset = DemonstrationDataset(episodic_dataset, **vars(args))
 
@@ -32,27 +33,27 @@ parser = ModelClass.add_model_specific_args(parser)
 args = parser.parse_args()
 
 train_set, test_set = torch.utils.data.random_split(
-        dataset, [int(len(dataset) * .8), len(dataset) - int(len(dataset) * .8)])
+    dataset, [int(len(dataset) * .8), len(dataset) - int(len(dataset) * .8)])
 train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
 test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
 
 model = ModelClass(
-        context_dim=dataset.get_context_dim(), 
-        action_dim=dataset.get_action_dim(), 
-        **vars(args))
-model.set_kl_scheduler(n_steps=args.max_epochs*len(train_loader)) 
+    context_dim=dataset.get_context_dim(),
+    action_dim=dataset.get_action_dim(),
+    **vars(args))
+model.set_kl_scheduler(n_steps=args.max_epochs*len(train_loader))
 
 if not args.no_wandb:
     wandb_logger = WandbLogger(
-            project="latent-action", entity="ucla-ncel-robotics")
+        project="latent-action", entity="ucla-ncel-robotics")
     trainer = Trainer(
-            logger=wandb_logger, 
-            auto_select_gpus=True,
-            max_epochs=args.max_epochs)
+        logger=wandb_logger,
+        auto_select_gpus=True,
+        max_epochs=args.max_epochs)
 else:
     trainer = Trainer(
-            auto_select_gpus=True,
-            max_epochs=args.max_epochs)
+        auto_select_gpus=True,
+        max_epochs=args.max_epochs)
 
 print(model)
 model_summary = ModelSummary(model)

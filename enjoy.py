@@ -8,12 +8,13 @@ import numpy as np
 import torch
 import gym
 import panda_gym
-from frankapy import FrankaArm
+# from frankapy import FrankaArm
 
 from latent_actions.cvae import vae, cvae, cae, gbc, aligned_decoder 
 from latent_actions.controllers.joystick import JoystickController
 from latent_actions.data.dataset import EpisodicDataset, DemonstrationDataset
 from latent_actions import visualization
+from latent_actions.envs.restricted_pick_and_place import RestrictedPandaPickAndPlaceEnv
 
 
 def find_latent_window(data_path: str, decoder: vae.VAE):
@@ -85,7 +86,8 @@ def simulate(
         conns: Iterable[mp.connection.Connection],
         step_rate: float,
         env_id: str):
-    env = gym.make(env_id, render=True).env
+    # env = gym.make(env_id, render=True).env
+    env = RestrictedPandaPickAndPlaceEnv(render=True, control_type="joints")
     _ = env.reset()
 
     controller = JoystickController(**latent_window)
@@ -154,12 +156,49 @@ if __name__ == '__main__':
         deploy_real_arm(decoder, latent_window)
 
     if decoder.action_dim == 8:
-        simulate(
-            decoder=decoder,
-            latent_window=latent_window,
-            conns=[],
-            step_rate=args.step_rate,
-            env_id='PandaPickAndPlaceJoints-v2')
+        if platform.system() == 'Darwin':
+            mp.set_start_method('spawn')
+
+        conn_recv_1, conn_send_1 = mp.Pipe(duplex=False)
+        conn_recv_2, conn_send_2 = mp.Pipe(duplex=False)
+
+        p_sim = mp.Process(
+            target=simulate,
+            args=(
+                decoder,
+                latent_window,
+                [conn_send_1, conn_send_2],
+                args.step_rate,
+                'PandaPickAndPlaceJoints-v2'))
+        p_viz_vec = mp.Process(
+                target=visualization.visualize_latent_actions_in_3d, 
+                args=(
+                    decoder, 
+                    conn_recv_1, 
+                    visualization.plot_vector_field, 
+                    latent_window['x_center'],
+                    latent_window['y_center'],
+                    latent_window['x_scale'],
+                    latent_window['y_scale'],
+                    5))
+        p_viz_man = mp.Process(
+                target=visualization.visualize_latent_actions_in_3d, 
+                args=(
+                    decoder, 
+                    conn_recv_2, 
+                    visualization.plot_manifold,
+                    latent_window['x_center'],
+                    latent_window['y_center'],
+                    latent_window['x_scale'],
+                    latent_window['y_scale'],
+                    10))
+
+        p_sim.start()
+        p_viz_vec.start()
+        p_viz_man.start()
+        p_sim.join()
+        p_viz_vec.join()
+        p_viz_man.join()
 
     elif decoder.action_dim == 4:
         if platform.system() == 'Darwin':
