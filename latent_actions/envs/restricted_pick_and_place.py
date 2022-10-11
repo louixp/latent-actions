@@ -19,10 +19,10 @@ class RestrictedPickAndPlace(Task):
         super().__init__(sim)
         self.reward_type = reward_type
         self.distance_threshold = distance_threshold
-        self.object_size = 0.04
-        self.possible_goals = [np.array([-0.15, 0.15, self.object_size / 2]),
-                               np.array([0, -0.15, self.object_size / 2])]
-        self.possible_objects = [np.array([0, 0, self.object_size / 2]), np.array([-0.15, -0.15, self.object_size / 2])]
+        self.object_size = 0.02
+        self.possible_goals = [np.array([0.537, -0.195, self.object_size / 2]),
+                               np.array([0.334,  0.158, self.object_size / 2])]
+        self.possible_objects = [np.array([0.335, -0.189, self.object_size / 2]), np.array([0.537, -0.028, self.object_size / 2])]
         with self.sim.no_rendering():
             self._create_scene()
             self.sim.place_visualizer(target_position=np.zeros(3), distance=0.9, yaw=45, pitch=-30)
@@ -30,7 +30,7 @@ class RestrictedPickAndPlace(Task):
     def _create_scene(self) -> None:
         """Create the scene."""
         self.sim.create_plane(z_offset=-0.4)
-        self.sim.create_table(length=1.1, width=0.7, height=0.4, x_offset=-0.3)
+        self.sim.create_table(length=1.1, width=0.7, height=0.4, x_offset=0)
         self.sim.create_box(
             body_name="object",
             half_extents=np.ones(3) * self.object_size / 2,
@@ -109,9 +109,7 @@ class RestrictedPandaPickAndPlaceEnv(RobotTaskEnv):
 
     def __init__(self, render: bool = False, reward_type: str = "sparse", control_type: str = "ee") -> None:
         sim = PyBullet(render=render)
-        robot = Panda(sim, block_gripper=False, base_position=np.array([-0.6, 0.0, 0.0]), control_type=control_type)
-        robot.set_joint_angles([ 1.19207576e-01,  4.28402138e-01,  4.35761332e-02, -1.82187401e+00,
-        -2.32348485e-02,  2.24982594e+00,  9.58834546e-01, 0.08, 0])
+        robot = Panda(sim, block_gripper=False, base_position=np.array([0.0, 0.0, 0.0]), control_type=control_type)
         task = RestrictedPickAndPlace(sim, reward_type=reward_type)
 
         super().__init__(robot, task)

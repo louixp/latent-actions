@@ -7,6 +7,8 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+# from augment import augment_data
+
 
 @dataclass
 class Step:
@@ -62,6 +64,8 @@ class DemonstrationDataset(Dataset):
                  action_space: str,
                  size_limit: int,
                  exclude_gripper: bool,
+#                  augment: bool,
+#                  augment_params: dict,
                  **kwargs):
 
         # excluded_context_keys = set(
@@ -107,6 +111,9 @@ class DemonstrationDataset(Dataset):
             self.contexts = self.contexts[: size_limit]
             self.actions = self.actions[: size_limit]
             self.human_actions = self.actions[: size_limit]
+
+#         if augment:
+#             self.contexts, self.actions, self.human_actions = augment_data(self.contexts, self.actions, self.human_actions, augment_params)
 
     def __len__(self) -> int:
         return len(self.contexts)

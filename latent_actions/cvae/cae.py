@@ -31,7 +31,9 @@ class ConditionalAE(cvae.ConditionalVAE):
                 kl_schedule="none",
                 activation=activation,
                 context_dim=context_dim,
-                action_dim=action_dim)
+                action_dim=action_dim,
+                fixed_point_coeff=fixed_point_coeff,
+                dropout=dropout)
 
         enc_dims = [action_dim + context_dim] + list(enc_dims) + [latent_dim]
         enc_layers = [
@@ -44,7 +46,7 @@ class ConditionalAE(cvae.ConditionalVAE):
         del self.fc_var
     
     def step(self, batch, batch_idx):
-        context, action = batch
+        context, action = batch['context'].float(), batch['action'].float()
         context = self.dropout(context)
         
         x = torch.cat([action, context], dim = 1)

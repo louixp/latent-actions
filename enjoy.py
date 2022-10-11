@@ -17,12 +17,18 @@ from latent_actions import visualization
 from latent_actions.envs.restricted_pick_and_place import RestrictedPandaPickAndPlaceEnv
 
 
-def find_latent_window(data_path: str, decoder: vae.VAE):
+def find_latent_window(data_path: str, decoder):
+
+    ds_kwargs = {'exclude_context_feature_pose':True,
+                'exclude_context_feature_joint_angles':True,
+                'exclude_context_feature_ee_rot':True}
     episodic_dataset = EpisodicDataset.load(data_path)
-    dataset = DemonstrationDataset(episodic_dataset, "joints", None, False)
+    dataset = DemonstrationDataset(episodic_dataset, "ee", None, False, **ds_kwargs)
     
     x_max, y_max = -np.inf, -np.inf
     x_min, y_min = np.inf, np.inf
+
+    dp = np.random.randint(len(episodic_dataset.episodes))
 
     for batch in dataset:
         context, action = torch.Tensor(batch['context']).float(), torch.tensor(batch['action']).float()
@@ -50,7 +56,7 @@ def find_latent_window(data_path: str, decoder: vae.VAE):
     x_scale = (x_max - x_min) / 2
     y_scale = (y_max - y_min) / 2
 
-    return {
+    return episodic_dataset.episodes[dp].steps[0].context['joint_angles'], {
             'x_center': x_center.item(), 
             'y_center': y_center.item(),
             'x_scale': x_scale.item(),
@@ -81,16 +87,19 @@ def deploy_real_arm(
                 curr_joints + action, duration=3, ignore_virtual_walls=True)
 
 def simulate(
-        decoder: vae.VAE, 
+        decoder, 
         latent_window: dict,
+        start_ja: np.array,
         conns: Iterable[mp.connection.Connection],
         step_rate: float,
         env_id: str):
     # env = gym.make(env_id, render=True).env
-    env = RestrictedPandaPickAndPlaceEnv(render=True, control_type="joints")
+    env = RestrictedPandaPickAndPlaceEnv(render=True, control_type="ee")
     _ = env.reset()
 
     controller = JoystickController(**latent_window)
+
+    env.robot.set_joint_angles(start_ja)
 
     done = False
     while not done:
@@ -103,9 +112,7 @@ def simulate(
                 conn.send(None)
             return
 
-        context = torch.tensor([
-                env.sim.get_joint_angle(env.robot.body_name, i)
-                for i in range(8)])
+        context = torch.tensor(np.hstack([env.robot.get_ee_position(), np.array([env.robot.get_fingers_width()])]))
 
         context = torch.unsqueeze(context, 0).float()
         for conn in conns:
@@ -149,7 +156,7 @@ if __name__ == '__main__':
     decoder = ModelClass.load_from_checkpoint(args.checkpoint_path)
     print('Decoder loaded.')
     
-    latent_window = find_latent_window(args.data_path, decoder)
+    start, latent_window = find_latent_window(args.data_path, decoder)
     print(f'Latent window: {latent_window}')
     
     if args.deploy_target == 'real':
@@ -167,6 +174,7 @@ if __name__ == '__main__':
             args=(
                 decoder,
                 latent_window,
+                start,
                 [conn_send_1, conn_send_2],
                 args.step_rate,
                 'PandaPickAndPlaceJoints-v2'))
@@ -212,6 +220,7 @@ if __name__ == '__main__':
             args=(
                 decoder,
                 latent_window,
+                start,
                 [conn_send_1, conn_send_2],
                 args.step_rate,
                 'PandaPickAndPlace-v1'))
