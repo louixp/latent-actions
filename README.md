@@ -23,7 +23,12 @@ The simulation spawn three processes:
 2. A vector field visualization that shows the conditional latent space.
 3. The embeded conditional 2D manifold of the latent space within the full 3D space.
 
+https://github.com/louixp/latent-actions/assets/52590858/cc0df693-7353-482c-8c15-c353165d3e11
+
 To exit a simulation, press back button on the controller.
 
 ## Real robot
 It works with a real robot too!
+
+https://github.com/louixp/latent-actions/assets/52590858/fc7d480d-c259-4740-ba51-1be8dc00ab09
+
